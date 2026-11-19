@@ -3,52 +3,242 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App Login</title>
+    <title>Login - WhatsApp & Telegram</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe');
             background-size: cover;
             background-position: center;
+            min-height: 100vh;
+            margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            padding: 16px;
             font-family: Arial, sans-serif;
         }
-        .login-box {
-            background: rgba(255, 255, 255, 0.85);
-            padding: 40px;
-            border-radius: 15px;
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+            backdrop-filter: blur(6px);
             text-align: center;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
         }
-        img#qr-code { 
-            width: 250px; 
-            height: 250px; 
-            margin: 15px 0;
+        .platform-tabs, .mode-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
         }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            background: #e5e7eb;
+            color: #111827;
+        }
+        .tab-btn.active.wa { background: #16a34a; color: #fff; }
+        .tab-btn.active.tg { background: #0284c7; color: #fff; }
+        .tab-btn.active.mode { background: #1f2937; color: #fff; }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            font-size: 15px;
+        }
+        .action-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: #2563eb;
+            color: #fff;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .save-btn {
+            background: #0f766e;
+            margin-top: 10px;
+        }
+        #qr-img {
+            width: 230px;
+            height: 230px;
+            margin: 12px auto;
+            display: none;
+            border-radius: 10px;
+            background: #fff;
+            padding: 8px;
+        }
+        .code-box {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 10px;
+            margin: 12px 0;
+            display: none;
+        }
+        .status-msg {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #334155;
+            min-height: 20px;
+        }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div class="login-box" id="login-container">
-        <h2>অ্যাপে প্রবেশ করতে স্ক্যান করুন</h2>
-        <img id="qr-code" src="" alt="QR Code লোড হচ্ছে...">
-        <p>আপনার হোয়াটসঅ্যাপের Linked Devices অপশন থেকে স্ক্যান করুন</p>
+    <div class="card" id="login-card">
+        <h2 style="margin-top:0;">অ্যাকাউন্ট লগ-ইন</h2>
+
+        <div class="platform-tabs">
+            <button type="button" class="tab-btn active wa" id="btn-wa" onclick="selectPlatform('whatsapp')">WhatsApp</button>
+            <button type="button" class="tab-btn tg" id="btn-tg" onclick="selectPlatform('telegram')">Telegram</button>
+        </div>
+
+        <div class="mode-tabs">
+            <button type="button" class="tab-btn active mode" id="btn-phone-mode" onclick="selectMode('phone')">নাম্বার দিয়ে লগ-ইন</button>
+            <button type="button" class="tab-btn mode" id="btn-qr-mode" onclick="selectMode('qr')">QR Code দিয়ে লগ-ইন</button>
+        </div>
+
+        <div id="phone-section">
+            <input type="text" id="phone-input" placeholder="ফোন নাম্বার লিখুন (যেমন: +88017xxxxxxxx)">
+            <button type="button" class="action-btn" onclick="submitPhone()">কোড পাঠান / লগ-ইন করুন</button>
+
+            <div id="tg-otp-box" class="hidden">
+                <input type="text" id="tg-code-input" placeholder="Telegram-এ আসা কোড লিখুন">
+                <input type="password" id="tg-2fa-input" placeholder="2FA Password থাকলে লিখুন (ঐচ্ছিক)">
+                <button type="button" class="action-btn" onclick="verifyTelegramCode()">কোড ভেরিফাই করুন</button>
+            </div>
+
+            <div class="code-box" id="wa-pairing-box"></div>
+        </div>
+
+        <div id="qr-section" class="hidden">
+            <button type="button" class="action-btn" onclick="requestQR()">QR Code তৈরি করুন</button>
+            <img id="qr-img" src="" alt="QR Code">
+            <button type="button" class="action-btn save-btn hidden" id="save-qr-btn" onclick="downloadQR()">QR Code সেভ / ডাউনলোড করুন</button>
+        </div>
+
+        <div class="status-msg" id="status-msg"></div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
-        socket.on('qr', (qrUrl) => {
-            document.getElementById('qr-code').src = qrUrl;
+        let currentPlatform = 'whatsapp';
+        let currentMode = 'phone';
+        let currentQrDataUrl = '';
+        let tgPhoneData = { phoneNumber: '', phoneCodeHash: '' };
+
+        function setStatus(text) {
+            document.getElementById('status-msg').innerText = text;
+        }
+
+        function selectPlatform(platform) {
+            currentPlatform = platform;
+            document.getElementById('btn-wa').classList.toggle('active', platform === 'whatsapp');
+            document.getElementById('btn-tg').classList.toggle('active', platform === 'telegram');
+            document.getElementById('tg-otp-box').classList.add('hidden');
+            document.getElementById('wa-pairing-box').style.display = 'none';
+            setStatus(`${platform === 'whatsapp' ? 'WhatsApp' : 'Telegram'} সিলেক্ট করা হয়েছে।`);
+        }
+
+        function selectMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-phone-mode').classList.toggle('active', mode === 'phone');
+            document.getElementById('btn-qr-mode').classList.toggle('active', mode === 'qr');
+            document.getElementById('phone-section').classList.toggle('hidden', mode !== 'phone');
+            document.getElementById('qr-section').classList.toggle('hidden', mode !== 'qr');
+            setStatus('');
+        }
+
+        function submitPhone() {
+            const phone = document.getElementById('phone-input').value.trim();
+            if (!phone) {
+                setStatus('দয়া করে সঠিক ফোন নাম্বার লিখুন।');
+                return;
+            }
+            setStatus('রিকোয়েস্ট পাঠানো হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...');
+            socket.emit('start_phone_login', { platform: currentPlatform, phone });
+        }
+
+        function verifyTelegramCode() {
+            const code = document.getElementById('tg-code-input').value.trim();
+            const password = document.getElementById('tg-2fa-input').value;
+            if (!code) {
+                setStatus('ভেরিফিকেশন কোড লিখুন।');
+                return;
+            }
+            setStatus('কোড যাচাই করা হচ্ছে...');
+            socket.emit('verify_tg_code', {
+                phoneNumber: tgPhoneData.phoneNumber,
+                phoneCodeHash: tgPhoneData.phoneCodeHash,
+                code,
+                password
+            });
+        }
+
+        function requestQR() {
+            setStatus('QR Code জেনারেট হচ্ছে...');
+            document.getElementById('save-qr-btn').classList.add('hidden');
+            socket.emit('start_qr', { platform: currentPlatform });
+        }
+
+        function downloadQR() {
+            if (!currentQrDataUrl) return;
+            const link = document.createElement('a');
+            link.href = currentQrDataUrl;
+            link.download = `${currentPlatform}-login-qr.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        socket.on('qr_code', ({ platform, image }) => {
+            if (platform !== currentPlatform) return;
+            currentQrDataUrl = image;
+            const img = document.getElementById('qr-img');
+            img.src = image;
+            img.style.display = 'block';
+            document.getElementById('save-qr-btn').classList.remove('hidden');
+            setStatus('QR Code তৈরি হয়েছে। স্ক্যান করুন বা নিচের বাটন থেকে সেভ করুন।');
         });
 
-        socket.on('authenticated', (url) => {
+        socket.on('pairing_code', ({ platform, code }) => {
+            if (platform === 'whatsapp') {
+                const box = document.getElementById('wa-pairing-box');
+                box.style.display = 'block';
+                box.innerText = code;
+                setStatus('WhatsApp এর Linked Devices -> Link with phone number এ এই কোডটি দিন।');
+            }
+        });
+
+        socket.on('tg_code_sent', ({ phoneCodeHash, phoneNumber }) => {
+            tgPhoneData = { phoneCodeHash, phoneNumber };
+            document.getElementById('tg-otp-box').classList.remove('hidden');
+            setStatus('আপনার Telegram অ্যাকাউন্টে কোড পাঠানো হয়েছে। নিচে কোডটি লিখুন।');
+        });
+
+        socket.on('authenticated', ({ url }) => {
+            setStatus('লগ-ইন সফল হয়েছে! কন্টেন্ট লোড হচ্ছে...');
             document.body.innerHTML = `<iframe src="${url}" style="width:100%; height:100vh; border:none; margin:0; padding:0;"></iframe>`;
+        });
+
+        socket.on('auth_error', ({ message }) => {
+            setStatus(`ত্রুটি: ${message}`);
         });
     </script>
 </body>
-  </html>
+</html>
