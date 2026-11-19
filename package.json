@@ -1,7 +1,7 @@
 {
-  "name": "whatsapp-login-project",
+  "name": "wa-tg-login-project",
   "version": "1.0.0",
-  "description": "WhatsApp Linked Device Login",
+  "description": "WhatsApp and Telegram Login via Phone Number or QR Code",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,6 +10,8 @@
     "express": "^4.18.2",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.2",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "telegram": "^2.24.4",
+    "input": "^1.0.1"
   }
 }
