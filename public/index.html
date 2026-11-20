@@ -12,6 +12,7 @@
       background: linear-gradient(135deg, #4338ca 0%, #9333ea 50%, #0891b2 100%);
       background-size: cover;
       background-position: center;
+      background-attachment: fixed;
       color: #f8fafc;
       display: flex;
       flex-direction: column;
@@ -22,7 +23,7 @@
     .notice-bar {
       width: 100%;
       max-width: 480px;
-      background: rgba(15, 23, 42, 0.85);
+      background: rgba(15, 23, 42, 0.88);
       border: 1px solid rgba(56, 189, 248, 0.35);
       color: #38bdf8;
       padding: 8px 14px;
@@ -47,7 +48,7 @@
       max-width: 460px;
       background: rgba(15, 23, 42, 0.90);
       backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 22px;
       padding: 28px 24px;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
@@ -64,7 +65,18 @@
       font-size: 14px;
       color: #cbd5e1;
       margin-top: 4px;
-      margin-bottom: 22px;
+      margin-bottom: 18px;
+    }
+    .custom-note-box {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #bae6fd;
+      font-size: 13px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+      text-align: center;
+      line-height: 1.45;
     }
     .tab-row {
       display: grid;
@@ -156,7 +168,7 @@
     }
     .auth-result-box {
       margin-top: 16px;
-      background: rgba(30, 41, 59, 0.9);
+      background: rgba(30, 41, 59, 0.92);
       border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 16px;
       padding: 16px;
@@ -167,7 +179,7 @@
       font-weight: 700;
       letter-spacing: 3px;
       color: #4ade80;
-      background: rgba(15, 23, 42, 0.9);
+      background: rgba(15, 23, 42, 0.95);
       padding: 10px 16px;
       border-radius: 10px;
       margin: 10px 0;
@@ -208,7 +220,7 @@
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(2, 6, 23, 0.8);
+      background: rgba(2, 6, 23, 0.82);
       display: none;
       align-items: center;
       justify-content: center;
@@ -238,7 +250,7 @@
     }
     /* User Dashboard */
     .dash-stat {
-      background: rgba(30, 41, 59, 0.8);
+      background: rgba(30, 41, 59, 0.82);
       border-radius: 12px;
       padding: 12px;
       margin-bottom: 10px;
@@ -252,10 +264,24 @@
       font-size: 12px;
       font-weight: 600;
     }
+    .support-pill {
+      display: inline-block;
+      margin-top: 12px;
+      background: rgba(15, 23, 42, 0.88);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 8px 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+    }
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
+
+  <div id="adSlotTop" class="hidden" style="margin-bottom:12px; max-width:460px; width:100%; text-align:center;"></div>
 
   <div id="noticeBar" class="notice-bar hidden">
     <div id="noticeText" class="notice-scroll"></div>
@@ -266,36 +292,45 @@
     <div id="siteTitle" class="brand-title">NexusPortal Pro</div>
     <div id="siteSubtitle" class="brand-sub">নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল</div>
 
-    <!-- Platform Tabs -->
-    <div class="tab-row">
-      <button id="tabWa" class="tab-btn active-wa" onclick="selectPlatform('whatsapp')">WhatsApp</button>
-      <button id="tabTg" class="tab-btn" onclick="selectPlatform('telegram')">Telegram</button>
+    <div id="customLoginNoteBox" class="custom-note-box hidden"></div>
+
+    <div id="maintenanceMsg" class="status-area hidden" style="color:#f87171; padding:18px 0;">
+      ⚠️ বর্তমানে পোর্টাল লগ-ইন সাময়িকভাবে বন্ধ রাখা হয়েছে।
     </div>
 
-    <!-- Method Tabs -->
-    <div class="tab-row">
-      <button id="tabPhone" class="tab-btn active-method" onclick="selectMethod('phone')">নাম্বার দিয়ে</button>
-      <button id="tabQr" class="tab-btn" onclick="selectMethod('qr')">QR Code দিয়ে</button>
-    </div>
+    <div id="loginFormBody">
+      <!-- Platform Tabs (Controlled by Admin) -->
+      <div id="platformTabRow" class="tab-row">
+        <button id="tabWa" class="tab-btn active-wa" onclick="selectPlatform('whatsapp')">WhatsApp</button>
+        <button id="tabTg" class="tab-btn" onclick="selectPlatform('telegram')">Telegram</button>
+      </div>
 
-    <!-- Inputs -->
-    <div id="phoneInputGroup" class="input-group">
-      <input id="phoneInput" type="tel" class="input-field" placeholder="+88018XXXXXXXX" />
-    </div>
+      <!-- Method Tabs (Controlled by Admin: both / phone_only / qr_only) -->
+      <div id="methodTabRow" class="tab-row">
+        <button id="tabPhone" class="tab-btn active-method" onclick="selectMethod('phone')">নাম্বার দিয়ে</button>
+        <button id="tabQr" class="tab-btn" onclick="selectMethod('qr')">QR Code দিয়ে</button>
+      </div>
 
-    <div class="input-group">
-      <input id="referralInput" type="text" class="input-field" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)" />
-    </div>
+      <!-- Phone Input -->
+      <div id="phoneInputGroup" class="input-group">
+        <input id="phoneInput" type="tel" class="input-field" placeholder="+88018XXXXXXXX" />
+      </div>
 
-    <!-- Mandatory Terms & Conditions Checkbox -->
-    <div id="termsContainer" class="terms-box">
-      <input id="termsCheckbox" type="checkbox" onchange="clearTermsError()" />
-      <label for="termsCheckbox">
-        আমি <span class="terms-link" onclick="openTermsModal(event)">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</span> পড়েছি এবং অ্যাকাউন্ট সংযোগ ও ব্যবস্থাপনায় সম্মতি দিচ্ছি।
-      </label>
-    </div>
+      <!-- Referral Input (Completely hidden when referralEnabled === false) -->
+      <div id="referralInputGroup" class="input-group">
+        <input id="referralInput" type="text" class="input-field" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)" />
+      </div>
 
-    <button id="submitBtn" class="primary-btn" onclick="startAuthFlow()">কোড পাঠান / এগিয়ে যান</button>
+      <!-- Mandatory Terms & Conditions Checkbox (Controlled by Admin) -->
+      <div id="termsContainer" class="terms-box">
+        <input id="termsCheckbox" type="checkbox" onchange="clearTermsError()" />
+        <label for="termsCheckbox">
+          আমি <span class="terms-link" onclick="openTermsModal(event)">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</span> পড়েছি এবং অ্যাকাউন্ট সংযোগ ও ব্যবস্থাপনায় সম্মতি দিচ্ছি।
+        </label>
+      </div>
+
+      <button id="submitBtn" class="primary-btn" onclick="startAuthFlow()">কোড পাঠান / এগিয়ে যান</button>
+    </div>
 
     <div id="statusMsg" class="status-area hidden"></div>
 
@@ -333,12 +368,13 @@
     </div>
 
     <div class="dash-stat">
-      <div style="font-size:13px; color:#94a3b8;">বর্তমান প্যাকেজ ও মেয়াদ</div>
+      <div style="font-size:13px; color:#94a3b8;">বর্তমান প্যাকেজ ও অবশিষ্ট সময়</div>
       <div id="dashPlanInfo" style="font-size:16px; font-weight:700; color:#4ade80; margin-top:2px;">Free Trial</div>
       <div id="dashExpiryInfo" style="font-size:13px; color:#cbd5e1; margin-top:2px;"></div>
     </div>
 
-    <div class="dash-stat">
+    <!-- Referral Card (Hidden when referralEnabled === false) -->
+    <div id="dashReferralCard" class="dash-stat">
       <div style="font-size:13px; color:#94a3b8;">আপনার রেফারেল কোড ও লিংক</div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
         <span id="dashRefCode" style="font-weight:700; color:#fbbf24; font-size:16px;">NX0000</span>
@@ -347,20 +383,19 @@
       <div id="dashRefStats" style="font-size:12.5px; color:#cbd5e1; margin-top:4px;"></div>
     </div>
 
-    <!-- Subscription Upgrade Form -->
-    <div class="dash-stat">
-      <div style="font-weight:700; font-size:15px; color:#38bdf8; margin-bottom:8px;">সাবস্ক্রিপশন নবায়ন / পেমেন্ট করুন</div>
+    <!-- Subscription Upgrade Form (Hidden when paymentEnabled === false) -->
+    <div id="dashPaymentSection" class="dash-stat">
+      <div style="font-weight:700; font-size:15px; color:#38bdf8; margin-bottom:6px;">সাবস্ক্রিপশন নবায়ন / পেমেন্ট করুন</div>
+      <div id="paymentInstructionText" style="font-size:12.5px; color:#cbd5e1; margin-bottom:6px;"></div>
       <div id="paymentNumbersDisplay" style="font-size:13px; color:#e2e8f0; margin-bottom:8px; line-height:1.5;"></div>
       <select id="planSelect" class="input-field" style="margin-bottom:8px; padding:10px;"></select>
-      <select id="payMethodSelect" class="input-field" style="margin-bottom:8px; padding:10px;">
-        <option value="bKash">bKash (বিকাশ)</option>
-        <option value="Nagad">Nagad (নগদ)</option>
-        <option value="Rocket">Rocket (রকেট)</option>
-      </select>
+      <select id="payMethodSelect" class="input-field" style="margin-bottom:8px; padding:10px;"></select>
       <input id="trxIdInput" type="text" class="input-field" placeholder="Transaction ID (TrxID) লিখুন" style="margin-bottom:8px; padding:10px;" />
       <button class="primary-btn" style="padding:10px;" onclick="submitPayment()">পেমেন্ট সাবমিট করুন</button>
       <div id="payMsg" style="font-size:13px; color:#4ade80; margin-top:6px;"></div>
     </div>
+
+    <a id="redirectActionBtn" href="#" class="primary-btn hidden" style="display:block; text-align:center; text-decoration:none; margin-bottom:10px; background:linear-gradient(90deg, #059669, #10b981);">মূল পোর্টালে প্রবেশ করুন &rarr;</a>
 
     <button class="small-btn" style="width:100%; background:#dc2626; padding:10px; font-weight:600;" onclick="logoutUser()">পোর্টাল থেকে লগ-আউট</button>
   </div>
@@ -368,7 +403,7 @@
   <!-- TERMS & CONDITIONS MODAL -->
   <div id="termsModal" class="modal-backdrop">
     <div class="modal-card">
-      <div style="font-size:18px; font-weight:700; color:#38bdf8;">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</div>
+      <div id="termsModalTitle" style="font-size:18px; font-weight:700; color:#38bdf8;">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</div>
       <div id="termsModalContent" class="modal-body">লোড হচ্ছে...</div>
       <div style="display:flex; gap:10px;">
         <button class="primary-btn" onclick="acceptTermsFromModal()">আমি সম্মত (Agree &amp; Continue)</button>
@@ -377,7 +412,9 @@
     </div>
   </div>
 
-  <div id="adSlot" style="margin-top:14px; max-width:460px; width:100%; text-align:center;"></div>
+  <a id="supportBtn" href="#" target="_blank" class="support-pill hidden">💬 সাপোর্ট</a>
+
+  <div id="adSlot" class="hidden" style="margin-top:14px; max-width:460px; width:100%; text-align:center;"></div>
 
   <script>
     let currentPlatform = 'whatsapp';
@@ -387,29 +424,96 @@
     let timerInterval = null;
     let publicConfig = {};
 
-    // Auto-fill referral code from URL ?ref=XXXX
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('ref')) {
-      document.getElementById('referralInput').value = urlParams.get('ref');
-    }
 
     async function loadConfig() {
       try {
         const res = await fetch('/api/public/config');
         publicConfig = await res.json();
+
         if (publicConfig.siteTitle) document.getElementById('siteTitle').textContent = publicConfig.siteTitle;
         if (publicConfig.siteSubtitle) document.getElementById('siteSubtitle').textContent = publicConfig.siteSubtitle;
         if (publicConfig.bgUrl) document.body.style.backgroundImage = `url('${publicConfig.bgUrl}')`;
+
+        // Custom Note
+        if (publicConfig.customLoginNote && publicConfig.customLoginNote.trim() !== '') {
+          const noteEl = document.getElementById('customLoginNoteBox');
+          noteEl.textContent = publicConfig.customLoginNote;
+          noteEl.classList.remove('hidden');
+        }
+
+        // Notice Bar
         if (publicConfig.noticeEnabled && publicConfig.noticeText) {
           document.getElementById('noticeText').textContent = publicConfig.noticeText;
           document.getElementById('noticeBar').classList.remove('hidden');
         }
-        if (publicConfig.termsText) {
-          document.getElementById('termsModalContent').textContent = publicConfig.termsText;
+
+        // Platform Policy
+        const waOn = publicConfig.whatsappEnabled !== false;
+        const tgOn = publicConfig.telegramEnabled !== false;
+        if (!waOn && !tgOn) {
+          document.getElementById('loginFormBody').classList.add('hidden');
+          document.getElementById('maintenanceMsg').classList.remove('hidden');
+        } else if (waOn && !tgOn) {
+          document.getElementById('platformTabRow').classList.add('hidden');
+          selectPlatform('whatsapp');
+        } else if (!waOn && tgOn) {
+          document.getElementById('platformTabRow').classList.add('hidden');
+          selectPlatform('telegram');
         }
-        if (publicConfig.adScript) {
-          const slot = document.getElementById('adSlot');
-          slot.innerHTML = publicConfig.adScript;
+
+        // Login Method Policy ('both' | 'phone_only' | 'qr_only')
+        const mode = publicConfig.loginMethodMode || 'both';
+        if (mode === 'phone_only') {
+          document.getElementById('methodTabRow').classList.add('hidden');
+          selectMethod('phone');
+        } else if (mode === 'qr_only') {
+          document.getElementById('methodTabRow').classList.add('hidden');
+          selectMethod('qr');
+        } else {
+          document.getElementById('methodTabRow').classList.remove('hidden');
+          selectMethod('phone');
+        }
+
+        // Referral Policy (Hide referral input if disabled)
+        if (publicConfig.referralEnabled === false) {
+          document.getElementById('referralInputGroup').classList.add('hidden');
+        } else {
+          document.getElementById('referralInputGroup').classList.remove('hidden');
+          if (urlParams.get('ref')) {
+            document.getElementById('referralInput').value = urlParams.get('ref');
+          }
+        }
+
+        // Terms & Conditions Policy
+        if (publicConfig.termsEnabled === false) {
+          document.getElementById('termsContainer').classList.add('hidden');
+        } else {
+          document.getElementById('termsContainer').classList.remove('hidden');
+          if (publicConfig.termsTitle) document.getElementById('termsModalTitle').textContent = publicConfig.termsTitle;
+          if (publicConfig.termsText) document.getElementById('termsModalContent').textContent = publicConfig.termsText;
+        }
+
+        // Support Button
+        if (publicConfig.supportEnabled && publicConfig.supportUrl) {
+          const sBtn = document.getElementById('supportBtn');
+          sBtn.textContent = publicConfig.supportLabel || '💬 সাপোর্ট';
+          sBtn.href = publicConfig.supportUrl;
+          sBtn.classList.remove('hidden');
+        }
+
+        // Ads Slots
+        if (publicConfig.adsEnabled !== false) {
+          if (publicConfig.adScriptTop) {
+            const topSlot = document.getElementById('adSlotTop');
+            topSlot.innerHTML = publicConfig.adScriptTop;
+            topSlot.classList.remove('hidden');
+          }
+          if (publicConfig.adScript) {
+            const botSlot = document.getElementById('adSlot');
+            botSlot.innerHTML = publicConfig.adScript;
+            botSlot.classList.remove('hidden');
+          }
         }
       } catch (e) {}
     }
@@ -472,10 +576,11 @@
     }
 
     async function startAuthFlow() {
+      const termsRequired = publicConfig.termsEnabled !== false;
       const termsChecked = document.getElementById('termsCheckbox').checked;
       const statusEl = document.getElementById('statusMsg');
 
-      if (!termsChecked) {
+      if (termsRequired && !termsChecked) {
         document.getElementById('termsContainer').classList.add('error-highlight');
         statusEl.textContent = '⚠️ লগ-ইন করার আগে শর্তাবলী (Terms & Conditions) চেকবক্সে টিক দিন।';
         statusEl.style.color = '#f87171';
@@ -484,7 +589,7 @@
       }
 
       const phone = document.getElementById('phoneInput').value.trim();
-      const referredBy = document.getElementById('referralInput').value.trim();
+      const referredBy = publicConfig.referralEnabled !== false ? document.getElementById('referralInput').value.trim() : '';
 
       if (currentMethod === 'phone' && phone.length < 10) {
         statusEl.textContent = '⚠️ সঠিক কান্ট্রি কোডসহ নাম্বার দিন (যেমন: +8801XXXXXXXXX)।';
@@ -506,7 +611,7 @@
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, method: currentMethod, referredBy, termsAccepted: true })
+          body: JSON.stringify({ phone, method: currentMethod, referredBy, termsAccepted: termsChecked })
         });
         const data = await res.json();
         btn.disabled = false;
@@ -613,6 +718,19 @@
       alert('পেয়ারিং কোড কপি হয়েছে: ' + code);
     }
 
+    function formatRemainingMinutes(expiresAt) {
+      const diffMs = new Date(expiresAt).getTime() - Date.now();
+      if (diffMs <= 0) return '⚠️ মেয়াদ শেষ হয়ে গেছে (০ মিনিট বাকি)';
+      const totalMins = Math.ceil(diffMs / 60000);
+      if (totalMins < 60) return `অবশিষ্ট সময়: ${totalMins} মিনিট`;
+      const hrs = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      if (hrs < 24) return `অবশিষ্ট সময়: ${hrs} ঘণ্টা ${mins} মিনিট`;
+      const days = Math.floor(hrs / 24);
+      const remHrs = hrs % 24;
+      return `অবশিষ্ট সময়: ${days} দিন ${remHrs} ঘণ্টা (${totalMins} মিনিট)`;
+    }
+
     async function showUserDashboard(user) {
       document.getElementById('authCard').classList.add('hidden');
       document.getElementById('userDashCard').classList.remove('hidden');
@@ -620,25 +738,62 @@
       document.getElementById('dashUserName').textContent = user.name || 'Portal User';
       document.getElementById('dashUserPhone').textContent = `${user.platform.toUpperCase()} • +${user.phone}`;
       document.getElementById('dashPlanInfo').textContent = user.planName || 'Free Trial';
+      document.getElementById('dashExpiryInfo').textContent = formatRemainingMinutes(user.expiresAt);
 
-      const expDate = new Date(user.expiresAt);
-      const isExpired = expDate < new Date();
-      document.getElementById('dashExpiryInfo').textContent = isExpired
-        ? '⚠️ সাবস্ক্রিপশনের মেয়াদ শেষ হয়েছে'
-        : `মেয়াদ শেষ: ${expDate.toLocaleDateString('bn-BD')} (${expDate.toLocaleTimeString('bn-BD')})`;
+      // Referral Section
+      if (publicConfig.referralEnabled === false) {
+        document.getElementById('dashReferralCard').classList.add('hidden');
+      } else {
+        document.getElementById('dashReferralCard').classList.remove('hidden');
+        document.getElementById('dashRefCode').textContent = user.referralCode || 'NX0000';
+        document.getElementById('dashRefStats').textContent = `মোট সফল রেফার: ${user.referralCount || 0} জন (প্রতি রেফারে +${publicConfig.referralBonusMinutes || 30} মিনিট বোনাস)`;
+      }
 
-      document.getElementById('dashRefCode').textContent = user.referralCode || 'NX0000';
-      document.getElementById('dashRefStats').textContent = `মোট সফল রেফার: ${user.referralCount || 0} জন (প্রতি রেফারে +${publicConfig.referralBonusDays || 2} দিন বোনাস)`;
+      // Payment Section
+      if (publicConfig.paymentEnabled === false) {
+        document.getElementById('dashPaymentSection').classList.add('hidden');
+      } else {
+        document.getElementById('dashPaymentSection').classList.remove('hidden');
+        document.getElementById('paymentInstructionText').textContent = publicConfig.paymentInstruction || '';
+        const nums = publicConfig.paymentNumbers || {};
+        const lines = [];
+        const methodSelect = document.getElementById('payMethodSelect');
+        methodSelect.innerHTML = '';
 
-      const nums = publicConfig.paymentNumbers || {};
-      document.getElementById('paymentNumbersDisplay').innerHTML =
-        `<b>bKash:</b> ${nums.bkash || '-'} | <b>Nagad:</b> ${nums.nagad || '-'} | <b>Rocket:</b> ${nums.rocket || '-'}` +
-        (nums.banglaQrUrl ? `<br><img src="${nums.banglaQrUrl}" style="max-width:140px; border-radius:8px; margin-top:6px;">` : '');
+        if (nums.bkashEnabled !== false && nums.bkash) {
+          lines.push(`<b>bKash:</b> ${nums.bkash}`);
+          methodSelect.innerHTML += '<option value="bKash">bKash (বিকাশ)</option>';
+        }
+        if (nums.nagadEnabled !== false && nums.nagad) {
+          lines.push(`<b>Nagad:</b> ${nums.nagad}`);
+          methodSelect.innerHTML += '<option value="Nagad">Nagad (নগদ)</option>';
+        }
+        if (nums.rocketEnabled !== false && nums.rocket) {
+          lines.push(`<b>Rocket:</b> ${nums.rocket}`);
+          methodSelect.innerHTML += '<option value="Rocket">Rocket (রকেট)</option>';
+        }
+        if (nums.banglaQrEnabled !== false && nums.banglaQrUrl) {
+          methodSelect.innerHTML += '<option value="Bangla QR">Bangla QR Scan</option>';
+        }
 
-      const planSelect = document.getElementById('planSelect');
-      planSelect.innerHTML = (publicConfig.plans || []).map(
-        (p) => `<option value="${p.id}">${p.name} — ৳${p.price}</option>`
-      ).join('');
+        let payHtml = lines.join(' | ');
+        if (nums.banglaQrEnabled !== false && nums.banglaQrUrl) {
+          payHtml += `<div style="margin-top:8px; text-align:center;"><img src="${nums.banglaQrUrl}" style="max-width:170px; border-radius:10px; border:2px solid #38bdf8; background:#fff; padding:4px;" alt="Bangla QR"></div>`;
+        }
+        document.getElementById('paymentNumbersDisplay').innerHTML = payHtml;
+
+        const planSelect = document.getElementById('planSelect');
+        planSelect.innerHTML = (publicConfig.plans || []).map(
+          (p) => `<option value="${p.id}">${p.name} — ৳${p.price}</option>`
+        ).join('');
+      }
+
+      // Post-Login Redirect Button if configured
+      if (publicConfig.postLoginRedirectUrl && publicConfig.postLoginRedirectUrl.trim() !== '') {
+        const rBtn = document.getElementById('redirectActionBtn');
+        rBtn.href = publicConfig.postLoginRedirectUrl.trim();
+        rBtn.classList.remove('hidden');
+      }
     }
 
     function copyReferralLink() {
