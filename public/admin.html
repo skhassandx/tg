@@ -1,1014 +1,755 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin SaaS Control Center</title>
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { margin: 0; background: #0b1120; color: #f1f5f9; display: flex; min-height: 100vh; }
-        .hidden { display: none !important; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusPortal Pro — অ্যাডমিন ড্যাশবোর্ড</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Hind Siliguri', sans-serif; }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+    /* Login Screen */
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: radial-gradient(circle at top, #1e293b, #0f172a);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      background: #1e293b;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 18px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    /* Layout */
+    .app-shell { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 260px;
+      background: #111827;
+      border-right: 1px solid rgba(255,255,255,0.08);
+      padding: 18px 14px;
+      flex-shrink: 0;
+      transition: transform 0.25s ease;
+    }
+    .brand {
+      font-size: 21px;
+      font-weight: 700;
+      color: #38bdf8;
+      padding: 6px 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 14px;
+    }
+    .nav-group {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      color: #64748b;
+      padding: 10px 10px 4px;
+      font-weight: 700;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: #cbd5e1;
+      font-size: 14.5px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: all 0.15s;
+    }
+    .nav-item:hover { background: rgba(56, 189, 248, 0.1); color: #ffffff; }
+    .nav-item.active { background: #1d4ed8; color: #ffffff; font-weight: 600; }
 
-        /* Login Screen */
-        .login-wrap { width: 100%; display: flex; justify-content: center; align-items: center; padding: 16px; }
-        .login-card { background: #1e293b; padding: 28px; border-radius: 16px; width: 100%; max-width: 380px; border: 1px solid #334155; }
+    .main-area {
+      flex: 1;
+      padding: 18px;
+      overflow-x: hidden;
+    }
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 18px;
+      background: #1e293b;
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .menu-toggle {
+      display: none;
+      background: #334155;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .db-badge {
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .db-mongo { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .db-local { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
 
-        /* Sidebar Navigation */
-        .sidebar {
-            width: 260px; background: #111827; border-right: 1px solid #1f2937;
-            display: flex; flex-direction: column; flex-shrink: 0; transition: 0.25s;
-        }
-        .sidebar-header {
-            padding: 18px; font-size: 18px; font-weight: 700; color: #38bdf8;
-            border-bottom: 1px solid #1f2937; display: flex; justify-content: space-between; align-items: center;
-        }
-        .menu-list { padding: 10px; flex: 1; overflow-y: auto; }
-        .menu-item {
-            padding: 11px 14px; border-radius: 10px; cursor: pointer; color: #cbd5e1;
-            font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 4px; transition: 0.15s;
-        }
-        .menu-item:hover, .menu-item.active { background: #1e293b; color: #38bdf8; }
-        .submenu { padding-left: 16px; margin-bottom: 6px; }
-        .submenu-item {
-            padding: 8px 12px; border-radius: 8px; cursor: pointer; color: #94a3b8;
-            font-size: 13px; margin-bottom: 2px; display: block;
-        }
-        .submenu-item:hover, .submenu-item.active { background: #0f172a; color: #38bdf8; font-weight: 600; }
+    .btn {
+      border: none;
+      padding: 8px 14px;
+      border-radius: 9px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+    }
+    .btn-green { background: #16a34a; }
+    .btn-blue { background: #2563eb; }
+    .btn-red { background: #dc2626; }
+    .btn-slate { background: #334155; }
+    .btn-sm { padding: 5px 9px; font-size: 12px; border-radius: 6px; }
 
-        /* Main Area */
-        .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-        .topbar {
-            background: #111827; border-bottom: 1px solid #1f2937; padding: 12px 18px;
-            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
-        }
-        .hamburger { display: none; background: #1e293b; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        .content-area { padding: 18px; flex: 1; overflow-y: auto; }
+    /* Stat Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .stat-card {
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .stat-label { font-size: 13.5px; color: #94a3b8; }
+    .stat-val { font-size: 28px; font-weight: 700; color: #38bdf8; margin: 4px 0; }
+    .stat-sub { font-size: 12.5px; color: #4ade80; }
 
-        /* DB Pill */
-        .db-pill {
-            padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
-            display: inline-flex; align-items: center; gap: 6px;
-        }
-        .db-ok { background: rgba(22, 163, 74, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.35); }
-        .db-warn { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); }
+    .panel-box {
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .panel-title { font-size: 17px; font-weight: 700; color: #f1f5f9; margin-bottom: 12px; }
 
-        /* Cards & Grids */
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 14px; margin-bottom: 20px; }
-        .kpi-card {
-            background: #1e293b; border: 1px solid #334155; padding: 16px; border-radius: 14px;
-            cursor: pointer; transition: 0.2s; position: relative;
-        }
-        .kpi-card:hover { transform: translateY(-3px); border-color: #38bdf8; }
-        .kpi-label { font-size: 12px; color: #94a3b8; }
-        .kpi-val { font-size: 26px; font-weight: 800; color: #38bdf8; margin: 6px 0 2px; }
-        .kpi-sub { font-size: 11px; color: #4ade80; }
+    .input-ctrl, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 14px;
+      margin-bottom: 10px;
+      outline: none;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    th { color: #94a3b8; font-weight: 600; }
 
-        .panel-card { background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 18px; margin-bottom: 18px; }
-        .panel-title { margin: 0 0 14px; font-size: 16px; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+    .msg-item {
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .msg-meta { display: flex; justify-content: space-between; font-size: 12px; color: #38bdf8; margin-bottom: 4px; }
+    .msg-body { font-size: 14px; color: #f1f5f9; white-space: pre-wrap; word-break: break-word; }
 
-        input, select, textarea {
-            width: 100%; padding: 10px 12px; margin: 6px 0 12px; border-radius: 9px;
-            border: 1px solid #475569; background: #0f172a; color: #f8fafc; font-size: 14px;
-        }
-        .btn {
-            padding: 9px 14px; border: none; border-radius: 9px; cursor: pointer;
-            background: #2563eb; color: #fff; font-weight: 600; font-size: 13px;
-        }
-        .btn-green { background: #16a34a; }
-        .btn-red { background: #dc2626; }
-        .btn-amber { background: #d97706; }
-        .btn-slate { background: #475569; }
-        .preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-        .preset-btn {
-            background: #0f172a; border: 1px solid #475569; color: #38bdf8;
-            padding: 5px 10px; border-radius: 7px; font-size: 12px; cursor: pointer; font-weight: 600;
-        }
-        .preset-btn:hover { border-color: #38bdf8; background: #1e3a8a; color: #fff; }
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(2,6,23,0.8);
+      display: none; align-items: center; justify-content: center; padding: 16px; z-index: 999;
+    }
+    .modal-box {
+      width: 100%; max-width: 420px; background: #1e293b; border-radius: 16px; padding: 20px;
+      border: 1px solid rgba(56,189,248,0.3);
+    }
+    .hidden { display: none !important; }
 
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 10px; border-bottom: 1px solid #334155; text-align: left; white-space: nowrap; }
-        th { color: #94a3b8; font-weight: 600; background: #0f172a; }
-
-        .badge { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
-        .badge-active { background: rgba(22, 163, 74, 0.2); color: #4ade80; }
-        .badge-banned { background: rgba(220, 38, 38, 0.2); color: #f87171; }
-        .badge-wa { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-        .badge-tg { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-
-        /* Modal */
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(2, 6, 23, 0.85);
-            display: flex; justify-content: center; align-items: center; padding: 16px; z-index: 1000;
-        }
-        .modal-box {
-            background: #1e293b; border: 1px solid #475569; border-radius: 16px;
-            width: 100%; max-width: 500px; padding: 20px; max-height: 90vh; overflow-y: auto;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar { position: fixed; top: 0; bottom: 0; left: -270px; z-index: 999; }
-            .sidebar.open { left: 0; }
-            .hamburger { display: inline-block; }
-        }
-    </style>
+    @media (max-width: 768px) {
+      .menu-toggle { display: inline-block; }
+      .sidebar {
+        position: fixed; top: 0; bottom: 0; left: 0; z-index: 900;
+        transform: translateX(-100%);
+      }
+      .sidebar.open { transform: translateX(0); }
+    }
+  </style>
 </head>
 <body>
 
-    <!-- Admin Login -->
-    <div class="login-wrap" id="admin-login-view">
-        <div class="login-card">
-            <h2 style="margin-top:0; color:#38bdf8;">Admin Control Center</h2>
-            <p style="font-size:13px; color:#94a3b8;">অ্যাডমিন প্যানেলে প্রবেশ করতে পাসওয়ার্ড দিন</p>
-            <input type="password" id="admin-pass-input" placeholder="Admin Password (ডিফল্ট: admin123)">
-            <button class="btn" style="width:100%;" onclick="loginAdmin()">লগ-ইন করুন</button>
-        </div>
+  <!-- ADMIN LOGIN -->
+  <div id="adminLoginView" class="login-wrap">
+    <div class="login-card">
+      <div style="font-size:24px; font-weight:700; color:#38bdf8; text-align:center;">NexusPortal Pro</div>
+      <div style="font-size:13.5px; color:#94a3b8; text-align:center; margin-bottom:18px;">অ্যাডমিন কন্ট্রোল প্যানেল</div>
+      <input id="adminPassInput" type="password" class="input-ctrl" placeholder="অ্যাডমিন পাসওয়ার্ড দিন" />
+      <button class="btn btn-blue" style="width:100%; padding:11px; font-size:15px;" onclick="adminLogin()">লগ-ইন করুন</button>
+      <div id="adminLoginErr" style="color:#f87171; font-size:13px; text-align:center; margin-top:10px;"></div>
     </div>
+  </div>
 
-    <!-- Admin App Shell -->
-    <div id="admin-app" class="hidden" style="display:flex; width:100%;">
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <span id="admin-brand-title">Nexus Admin</span>
-                <button class="hamburger" onclick="toggleSidebar()">✕</button>
-            </div>
-            <div class="menu-list">
-                <div class="menu-item active" id="nav-dashboard" onclick="switchView('dashboard')">📊 ড্যাশবোর্ড</div>
+  <!-- ADMIN DASHBOARD SHELL -->
+  <div id="adminAppView" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">NexusPortal Pro</div>
+      <div class="nav-item active" onclick="switchSection('dashboard', this)">📊 ড্যাশবোর্ড</div>
+      <div class="nav-item" onclick="switchSection('users', this)">👥 ইউজার ও অ্যাকাউন্ট</div>
+      <div class="nav-item" onclick="switchSection('messages', this)">💬 মেসেজ ও সেশন চেক</div>
 
-                <div class="menu-item" onclick="toggleSubmenu('sub-users')">👥 ইউজার ও অ্যাকাউন্ট ▾</div>
-                <div class="submenu" id="sub-users">
-                    <div class="submenu-item" id="nav-users-all" onclick="switchView('users-all')">• সকল ইউজার লিস্ট</div>
-                    <div class="submenu-item" onclick="openAddUserModal()">• + নতুন ইউজার যোগ করুন</div>
-                    <div class="submenu-item" id="nav-users-banned" onclick="switchView('users-banned')">• ব্যানকৃত ইউজার (Banned)</div>
-                    <div class="submenu-item" id="nav-login-history" onclick="switchView('login-history')">• লগ-ইন হিস্ট্রি</div>
-                </div>
+      <div class="nav-group">পেমেন্ট সিস্টেম</div>
+      <div class="nav-item" onclick="switchSection('payments', this)">💳 পেমেন্ট হিস্ট্রি ও নাম্বার</div>
 
-                <div class="menu-item" id="nav-session-check" onclick="switchView('session-check')">💬 মেসেজ ও সেশন চেক</div>
+      <div class="nav-group">প্যাকেজ ও গ্রোথ</div>
+      <div class="nav-item" onclick="switchSection('plans', this)">⏳ সাবস্ক্রিপশন ও ফ্রি ট্রায়াল</div>
+      <div class="nav-item" onclick="switchSection('referrals', this)">🎁 রেফারেল সিস্টেম</div>
+      <div class="nav-item" onclick="switchSection('notice', this)">📢 নোটিশ বার</div>
 
-                <div class="menu-item" onclick="toggleSubmenu('sub-payments')">💳 পেমেন্ট সিস্টেম ▾</div>
-                <div class="submenu" id="sub-payments">
-                    <div class="submenu-item" id="nav-payments-history" onclick="switchView('payments-history')">• পেমেন্ট হিস্ট্রি</div>
-                    <div class="submenu-item" id="nav-payments-settings" onclick="switchView('payments-settings')">• পেমেন্ট নাম্বার ও বাংলা QR</div>
-                </div>
+      <div class="nav-group">সেটিংস</div>
+      <div class="nav-item" onclick="switchSection('settings', this)">⚙️ জেনারেল, শর্তাবলী ও পাসওয়ার্ড</div>
+    </aside>
 
-                <div class="menu-item" id="nav-subscriptions" onclick="switchView('subscriptions')">⏳ সাবস্ক্রিপশন ও ফ্রি ট্রায়াল</div>
-                <div class="menu-item" id="nav-referrals" onclick="switchView('referrals')">🎁 রেফারেল সিস্টেম</div>
-                <div class="menu-item" id="nav-notices" onclick="switchView('notices')">📢 নোটিশ বার</div>
-
-                <div class="menu-item" onclick="toggleSubmenu('sub-settings')">⚙️ সেটিংস ▾</div>
-                <div class="submenu" id="sub-settings">
-                    <div class="submenu-item" id="nav-settings-general" onclick="switchView('settings-general')">• জেনারেল ও ব্যাকগ্রাউন্ড</div>
-                    <div class="submenu-item" id="nav-settings-security" onclick="switchView('settings-security')">• অ্যাডমিন পাসওয়ার্ড</div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <div class="main-wrapper">
-            <header class="topbar">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <button class="hamburger" onclick="toggleSidebar()">☰</button>
-                    <strong id="page-heading">ড্যাশবোর্ড ওভারভিউ</strong>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <span id="db-status-pill" class="db-pill db-warn">ডাটাবেস যাচাই হচ্ছে...</span>
-                    <button class="btn btn-green" onclick="openAddUserModal()">+ ইউজার এড</button>
-                    <button class="btn btn-red" onclick="location.reload()">লগ-আউট</button>
-                </div>
-            </header>
-
-            <main class="content-area">
-                <!-- VIEW: DASHBOARD -->
-                <section id="view-dashboard">
-                    <div class="kpi-grid" id="kpi-container"></div>
-
-                    <div class="panel-card">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                            <strong>সাম্প্রতিক লগ-ইন হিস্ট্রি</strong>
-                            <button class="btn btn-slate" onclick="switchView('login-history')">সব দেখুন →</button>
-                        </div>
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>সময়</th><th>ইউজার</th><th>প্ল্যাটফর্ম</th><th>মেথড</th><th>স্ট্যাটাস</th></tr></thead>
-                                <tbody id="dash-recent-logins"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="panel-card">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                            <strong>সাম্প্রতিক পেমেন্টসমূহ</strong>
-                            <button class="btn btn-slate" onclick="switchView('payments-history')">সব দেখুন →</button>
-                        </div>
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>User ID</th><th>প্যাকেজ</th><th>টাকা</th><th>TrxID</th></tr></thead>
-                                <tbody id="dash-recent-payments"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: ALL USERS -->
-                <section id="view-users-all" class="hidden">
-                    <div class="panel-card">
-                        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:14px;">
-                            <h3 style="margin:0; font-size:16px;">সকল ইউজার ম্যানেজমেন্ট</h3>
-                            <button class="btn btn-green" onclick="openAddUserModal()">+ ম্যানুয়ালি ইউজার এড করুন</button>
-                        </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-                            <input type="text" id="user-search-input" style="flex:2; margin:0;" placeholder="ID, নাম বা ফোন নাম্বার দিয়ে খুঁজুন..." onkeyup="renderUsersTable()">
-                            <select id="user-platform-filter" style="flex:1; margin:0;" onchange="renderUsersTable()">
-                                <option value="all">সব প্ল্যাটফর্ম</option>
-                                <option value="whatsapp">WhatsApp</option>
-                                <option value="telegram">Telegram</option>
-                            </select>
-                        </div>
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>User ID</th>
-                                        <th>নাম</th>
-                                        <th>ফোন / অ্যাকাউন্ট</th>
-                                        <th>প্ল্যাটফর্ম</th>
-                                        <th>মেথড</th>
-                                        <th>মেয়াদ শেষ</th>
-                                        <th>স্ট্যাটাস</th>
-                                        <th>অ্যাকশন</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="all-users-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: BANNED USERS -->
-                <section id="view-users-banned" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title" style="color:#f87171;">ব্যানকৃত ইউজার তালিকা</h3>
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr><th>User ID</th><th>ফোন / অ্যাকাউন্ট</th><th>প্ল্যাটফর্ম</th><th>ব্যানের কারণ</th><th>অ্যাকশন</th></tr>
-                                </thead>
-                                <tbody id="banned-users-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: LOGIN HISTORY -->
-                <section id="view-login-history" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">সকল ইউজারের লগ-ইন হিস্ট্রি</h3>
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr><th>তারিখ ও সময়</th><th>User ID</th><th>ফোন</th><th>প্ল্যাটফর্ম</th><th>মেথড</th><th>IP Address</th><th>স্ট্যাটাস</th></tr>
-                                </thead>
-                                <tbody id="login-history-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: SESSION & MESSAGE CHECK -->
-                <section id="view-session-check" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">ইউজার অ্যাকাউন্ট সেশন ও মেসেজ চেক বার</h3>
-                        <label>ইউজার সিলেক্ট করুন:</label>
-                        <select id="inspect-user-select"></select>
-                        <label>টেস্ট মেসেজ পাঠাতে চাইলে প্রাপকের নাম্বার বা ইউজারনেম দিন (ঐচ্ছিক):</label>
-                        <input type="text" id="test-receiver" placeholder="যেমন: 88017xxxxxxxx অথবা @username">
-                        <label>মেসেজ টেক্সট (ঐচ্ছিক):</label>
-                        <input type="text" id="test-msg-text" placeholder="মেসেজ লিখুন...">
-                        <button class="btn" onclick="inspectUserSession()">চ্যাট হিস্ট্রি দেখুন / মেসেজ পাঠান</button>
-
-                        <div id="inspect-result-box" style="margin-top:16px;"></div>
-                    </div>
-                </section>
-
-                <!-- VIEW: PAYMENTS HISTORY -->
-                <section id="view-payments-history" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">সকল পেমেন্ট হিস্ট্রি</h3>
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr><th>Pay ID</th><th>User ID</th><th>ফোন</th><th>প্যাকেজ</th><th>পরিমাণ</th><th>Sender / Ref</th><th>TrxID</th><th>সময়</th></tr>
-                                </thead>
-                                <tbody id="payments-history-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: PAYMENTS SETTINGS -->
-                <section id="view-payments-settings" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">পেমেন্ট নাম্বার ও বাংলা QR Code সেটআপ</h3>
-                        <label>পেমেন্ট রিসিভ নাম্বার (bKash / Nagad / Rocket):</label>
-                        <input type="text" id="cfg-pay-num">
-                        <label>পেমেন্ট নির্দেশনা (User Modal-এ দেখাবে):</label>
-                        <input type="text" id="cfg-pay-note">
-                        <label>বাংলা QR Code ছবি আপলোড করুন:</label>
-                        <input type="file" accept="image/*" onchange="handleFileBase64(this, 'qr')">
-                        <div id="qr-preview-wrap" style="margin:10px 0;"></div>
-                        <button class="btn btn-green" onclick="saveAllSettings()">পেমেন্ট সেটিংস সেভ করুন</button>
-                    </div>
-                </section>
-
-                <!-- VIEW: SUBSCRIPTIONS & FREE TRIAL -->
-                <section id="view-subscriptions" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">ফ্রি ট্রায়াল সময় কনফিগারেশন</h3>
-                        <label>নতুন অ্যাকাউন্টের জন্য ফ্রি ট্রায়াল সময় (মিনিটে):</label>
-                        <input type="number" id="cfg-trial-mins">
-                        <button class="btn btn-green" onclick="saveAllSettings()">ট্রায়াল সময় সেভ করুন</button>
-                    </div>
-
-                    <div class="panel-card">
-                        <h3 class="panel-title">সাবস্ক্রিপশন প্যাকেজ তৈরি ও ম্যানেজ</h3>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-                            <input type="text" id="new-plan-name" placeholder="প্যাকেজের নাম (যেমন: ১৫ দিন)">
-                            <input type="number" id="new-plan-mins" placeholder="সময় (মিনিটে, যেমন: 21600)">
-                            <input type="number" id="new-plan-price" placeholder="মূল্য (টাকায়)">
-                        </div>
-                        <button class="btn" onclick="createPlan()">+ নতুন প্যাকেজ যোগ করুন</button>
-
-                        <div class="table-wrap" style="margin-top:14px;">
-                            <table>
-                                <thead><tr><th>প্যাকেজের নাম</th><th>সময় (মিনিট)</th><th>মূল্য (৳)</th><th>অ্যাকশন</th></tr></thead>
-                                <tbody id="plans-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: REFERRAL SYSTEM -->
-                <section id="view-referrals" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">রেফারেল সিস্টেম সেটিংস</h3>
-                        <label><input type="checkbox" id="cfg-en-ref" style="width:auto;"> রেফারেল সিস্টেম চালু রাখুন</label>
-                        <label>প্রতি সফল রেফারে বোনাস সময় (মিনিটে):</label>
-                        <input type="number" id="cfg-ref-bonus">
-                        <button class="btn btn-green" onclick="saveAllSettings()">রেফারেল সেটিংস সেভ করুন</button>
-                    </div>
-
-                    <div class="panel-card">
-                        <h3 class="panel-title">রেফারেল লিডারবোর্ড ও রিপোর্ট</h3>
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>User ID</th><th>ফোন</th><th>রেফারেল কোড</th><th>মোট রেফার</th><th>মোট বোনাস (মিনিট)</th></tr></thead>
-                                <tbody id="referrals-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: NOTICES -->
-                <section id="view-notices" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">নতুন নোটিশ পাঠান</h3>
-                        <label>কাদের কাছে পাঠাবেন (ফিল্টার / নির্দিষ্ট ইউজার):</label>
-                        <select id="notice-target-select"></select>
-                        <label>নোটিশের শিরোনাম:</label>
-                        <input type="text" id="notice-title-input" placeholder="যেমন: জরুরি ঘোষণা">
-                        <label>নোটিশের বিস্তারিত:</label>
-                        <textarea id="notice-msg-input" rows="3" placeholder="আপনার বার্তা লিখুন..."></textarea>
-                        <button class="btn" onclick="broadcastNotice()">নোটিশ পাবলিশ করুন</button>
-                    </div>
-
-                    <div class="panel-card">
-                        <h3 class="panel-title">পূর্ববর্তী নোটিশ তালিকা</h3>
-                        <div class="table-wrap">
-                            <table>
-                                <thead><tr><th>টার্গেট</th><th>শিরোনাম</th><th>বার্তা</th><th>অ্যাকশন</th></tr></thead>
-                                <tbody id="notices-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VIEW: GENERAL SETTINGS -->
-                <section id="view-settings-general" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">জেনারেল ও লগ-ইন পেইজ সেটিংস</h3>
-                        <label>ওয়েবসাইট / অ্যাপের নাম:</label>
-                        <input type="text" id="cfg-app-name">
-                        <label>লগ-ইন ব্যাকগ্রাউন্ড ইমেজ URL:</label>
-                        <input type="text" id="cfg-bg-url">
-                        <label>অথবা সরাসরি ব্যাকগ্রাউন্ড ছবি আপলোড করুন:</label>
-                        <input type="file" accept="image/*" onchange="handleFileBase64(this, 'bg')">
-                        <label>লগ-ইন সফল হলে মূল কন্টেন্ট Redirect URL:</label>
-                        <input type="text" id="cfg-redirect-url">
-                        <div style="margin:10px 0;">
-                            <label><input type="checkbox" id="cfg-en-wa" style="width:auto;"> WhatsApp লগ-ইন চালু</label>
-                            &nbsp;&nbsp;&nbsp;
-                            <label><input type="checkbox" id="cfg-en-tg" style="width:auto;"> Telegram লগ-ইন চালু</label>
-                        </div>
-                        <button class="btn btn-green" onclick="saveAllSettings()">সব সেটিংস সেভ করুন</button>
-                    </div>
-                </section>
-
-                <!-- VIEW: SECURITY SETTINGS -->
-                <section id="view-settings-security" class="hidden">
-                    <div class="panel-card">
-                        <h3 class="panel-title">অ্যাডমিন প্যানেল পাসওয়ার্ড পরিবর্তন</h3>
-                        <label>নতুন অ্যাডমিন পাসওয়ার্ড দিন:</label>
-                        <input type="text" id="cfg-admin-pass" placeholder="নতুন পাসওয়ার্ড লিখুন">
-                        <button class="btn btn-amber" onclick="updateAdminPassword()">পাসওয়ার্ড আপডেট করুন</button>
-                    </div>
-                </section>
-            </main>
+    <main class="main-area">
+      <div class="topbar">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+          <span id="pageHeading" style="font-size:19px; font-weight:700;">ড্যাশবোর্ড ওভারভিউ</span>
         </div>
-    </div>
-
-    <!-- Manual Add User Modal -->
-    <div class="modal-overlay hidden" id="add-user-modal">
-        <div class="modal-box">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:12px;">
-                <h3 style="margin:0; color:#4ade80;">+ ম্যানুয়ালি নতুন ইউজার যোগ করুন</h3>
-                <button class="btn btn-slate" onclick="closeAddUserModal()">✕</button>
-            </div>
-
-            <label>ইউজারের নাম (ঐচ্ছিক):</label>
-            <input type="text" id="add-user-name" placeholder="যেমন: হাসান আল মামুন">
-
-            <label>ফোন নাম্বার বা ইউজারনেম (আবশ্যক):</label>
-            <input type="text" id="add-user-phone" placeholder="যেমন: 8801818896166">
-
-            <label>প্ল্যাটফর্ম সিলেক্ট করুন:</label>
-            <select id="add-user-platform">
-                <option value="whatsapp">WhatsApp</option>
-                <option value="telegram">Telegram</option>
-            </select>
-
-            <label>সাবস্ক্রিপশন সময় (মিনিটে):</label>
-            <input type="number" id="add-user-mins" value="1440">
-            <div class="preset-row">
-                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=15">১৫ মিনিট</button>
-                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=1440">১ দিন (1440m)</button>
-                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=10080">৭ দিন (10080m)</button>
-                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=43200">৩০ দিন (43200m)</button>
-            </div>
-
-            <label>অ্যাডমিন নোট (ঐচ্ছিক):</label>
-            <input type="text" id="add-user-note" placeholder="যেমন: ক্যাশ পেমেন্টে এড করা হলো">
-
-            <button class="btn btn-green" style="width:100%;" onclick="submitManualUser()">ইউজার তৈরি করুন</button>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+          <span id="dbStatusBadge" class="db-badge db-mongo">● MongoDB Atlas (nexus_saas)</span>
+          <button class="btn btn-green" onclick="openAddUserModal()">+ ইউজার এড</button>
+          <button class="btn btn-red" onclick="adminLogout()">লগ-আউট</button>
         </div>
-    </div>
+      </div>
 
-    <!-- User Details & Control Modal -->
-    <div class="modal-overlay hidden" id="user-detail-modal">
-        <div class="modal-box">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px;">
-                <h3 style="margin:0; color:#38bdf8;">ইউজার প্রোফাইল ও কন্ট্রোল</h3>
-                <button class="btn btn-slate" onclick="closeUserModal()">✕</button>
-            </div>
-            <div id="user-modal-body" style="margin-top:14px; font-size:13px; line-height:1.7;"></div>
+      <!-- SECTION: DASHBOARD -->
+      <div id="sec-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">মোট ইউজার (Total)</div>
+            <div id="stTotalUsers" class="stat-val">0</div>
+            <div id="stSubBreakdown" class="stat-sub">QR: 0 | নাম্বার/ম্যানুয়াল: 0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">WhatsApp ইউজার</div>
+            <div id="stWaUsers" class="stat-val">0</div>
+            <div id="stWaToday" class="stat-sub">আজকে নতুন: +0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Telegram ইউজার</div>
+            <div id="stTgUsers" class="stat-val">0</div>
+            <div id="stTgToday" class="stat-sub">আজকে নতুন: +0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">সক্রিয় সাবস্ক্রিপশন</div>
+            <div id="stActiveSubs" class="stat-val">0</div>
+            <div class="stat-sub">সচল অ্যাকাউন্ট</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">ব্যানকৃত ইউজার</div>
+            <div id="stBannedUsers" class="stat-val" style="color:#f87171;">0</div>
+            <div class="stat-sub" style="color:#94a3b8;">নিরাপত্তা নিয়ন্ত্রণ</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">মোট পেমেন্ট আয়</div>
+            <div id="stRevenue" class="stat-val">৳0</div>
+            <div class="stat-sub">অনুমোদিত পেমেন্ট</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">মোট রেফারেল</div>
+            <div id="stReferrals" class="stat-val">0</div>
+            <div class="stat-sub">সফল ইনভাইট</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">আজকের লগ-ইন</div>
+            <div id="stTodayLogins" class="stat-val">0</div>
+            <div class="stat-sub">সর্বমোট সেশন</div>
+          </div>
         </div>
+
+        <div class="panel-box">
+          <div class="panel-title">সাম্প্রতিক লগ-ইন হিস্ট্রি</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>নাম্বার / ইউজার</th><th>প্ল্যাটফর্ম</th><th>পদ্ধতি</th><th>সময়</th></tr></thead>
+              <tbody id="recentLoginsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: USERS -->
+      <div id="sec-users" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">সকল ইউজার ও সেশন তালিকা</div>
+          <input id="userSearchInput" class="input-ctrl" placeholder="নাম্বার বা নাম দিয়ে খুঁজুন..." oninput="renderUsersTable()" />
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>ইউজার ও নাম্বার</th>
+                  <th>প্ল্যাটফর্ম</th>
+                  <th>সেশন</th>
+                  <th>প্যাকেজ ও মেয়াদ</th>
+                  <th>অ্যাকশন</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: MESSAGES & SESSION CHECK -->
+      <div id="sec-messages" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">💬 মেসেজ ও সেশন চেক (ইনকামিং মেসেজ / OTP রিডার)</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <select id="msgUserSelect" style="flex:1; margin-bottom:0;" onchange="loadUserMessages()"></select>
+            <button class="btn btn-blue" onclick="loadUserMessages()">🔄 রিফ্রেশ করুন</button>
+          </div>
+          <div id="liveSessionStatusBox" style="margin-bottom:12px; font-size:14px; color:#fbbf24;"></div>
+          <div id="messagesFeed"></div>
+        </div>
+      </div>
+
+      <!-- SECTION: PAYMENTS -->
+      <div id="sec-payments" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">পেমেন্ট নাম্বার ও বাংলা QR সেটিংস</div>
+          <label>bKash নাম্বার</label>
+          <input id="payBkash" class="input-ctrl" />
+          <label>Nagad নাম্বার</label>
+          <input id="payNagad" class="input-ctrl" />
+          <label>Rocket নাম্বার</label>
+          <input id="payRocket" class="input-ctrl" />
+          <label>বাংলা QR ইমেজ লিংক (ঐচ্ছিক)</label>
+          <input id="payQrUrl" class="input-ctrl" placeholder="https://..." />
+          <button class="btn btn-green" onclick="savePaymentNumbers()">সেভ করুন</button>
+        </div>
+
+        <div class="panel-box">
+          <div class="panel-title">পেমেন্ট হিস্ট্রি ও অনুমোদন</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>TrxID</th><th>ইউজার</th><th>প্যাকেজ</th><th>মাধ্যম</th><th>স্ট্যাটাস</th><th>অ্যাকশন</th></tr></thead>
+              <tbody id="paymentsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: PLANS & FREE TRIAL -->
+      <div id="sec-plans" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">ফ্রি ট্রায়াল ও সাবস্ক্রিপশন প্যাকেজ</div>
+          <label>নতুন ইউজারের ফ্রি ট্রায়াল (দিন)</label>
+          <input id="trialDaysInput" type="number" class="input-ctrl" />
+          <button class="btn btn-blue" onclick="saveTrialDays()">ফ্রি ট্রায়াল সেভ করুন</button>
+        </div>
+        <div class="panel-box">
+          <div class="panel-title">নতুন প্যাকেজ যোগ করুন</div>
+          <input id="newPlanName" class="input-ctrl" placeholder="প্যাকেজের নাম (যেমন: VIP 30 Days)" />
+          <input id="newPlanDays" type="number" class="input-ctrl" placeholder="মেয়াদ (দিন)" />
+          <input id="newPlanPrice" type="number" class="input-ctrl" placeholder="মূল্য (টাকা)" />
+          <button class="btn btn-green" onclick="addNewPlan()">+ প্যাকেজ যোগ করুন</button>
+          <div id="plansListBox" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <!-- SECTION: REFERRALS -->
+      <div id="sec-referrals" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">রেফারেল বোনাস সেটিংস</div>
+          <label>প্রতি সফল রেফারে বোনাস মেয়াদ (দিন)</label>
+          <input id="refBonusInput" type="number" class="input-ctrl" />
+          <button class="btn btn-green" onclick="saveRefBonus()">সেভ করুন</button>
+        </div>
+      </div>
+
+      <!-- SECTION: NOTICE BAR -->
+      <div id="sec-notice" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">হোমপেজ নোটিশ বার</div>
+          <label>নোটিশ স্ট্যাটাস</label>
+          <select id="noticeEnabledSelect" class="input-ctrl">
+            <option value="true">চালু (Enabled)</option>
+            <option value="false">বন্ধ (Disabled)</option>
+          </select>
+          <label>নোটিশ লেখা</label>
+          <textarea id="noticeTextInput" rows="3"></textarea>
+          <button class="btn btn-green" onclick="saveNotice()">নোটিশ আপডেট করুন</button>
+        </div>
+      </div>
+
+      <!-- SECTION: SETTINGS & TERMS -->
+      <div id="sec-settings" class="hidden">
+        <div class="panel-box">
+          <div class="panel-title">জেনারেল, শর্তাবলী (Terms & Conditions) ও অ্যাডস</div>
+          <label>পোর্টালের নাম (Title)</label>
+          <input id="setSiteTitle" class="input-ctrl" />
+          <label>সাব-টাইটেল</label>
+          <input id="setSiteSubtitle" class="input-ctrl" />
+          <label>ব্যাকগ্রাউন্ড ইমেজ URL (খালি রাখলে ডিফল্ট গ্রেডিয়েন্ট থাকবে)</label>
+          <input id="setBgUrl" class="input-ctrl" />
+          <label>শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions লেখা)</label>
+          <textarea id="setTermsText" rows="6"></textarea>
+          <label>Ads Script (Monetag / Adsterra HTML কোড)</label>
+          <textarea id="setAdScript" rows="3"></textarea>
+          <label>নতুন অ্যাডমিন পাসওয়ার্ড (পরিবর্তন করতে চাইলে লিখুন)</label>
+          <input id="setNewAdminPass" type="password" class="input-ctrl" placeholder="আগের পাসওয়ার্ড রাখতে খালি রাখুন" />
+          <button class="btn btn-blue" onclick="saveGeneralSettings()">সব সেটিংস সেভ করুন</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ADD USER MODAL -->
+  <div id="addUserModal" class="modal-bg">
+    <div class="modal-box">
+      <div class="panel-title">+ ম্যানুয়াল ইউজার যোগ করুন</div>
+      <input id="addPhone" class="input-ctrl" placeholder="+8801XXXXXXXXX" />
+      <input id="addName" class="input-ctrl" placeholder="ইউজারের নাম" />
+      <select id="addPlatform" class="input-ctrl">
+        <option value="whatsapp">WhatsApp</option>
+        <option value="telegram">Telegram</option>
+      </select>
+      <input id="addDays" type="number" class="input-ctrl" value="30" placeholder="মেয়াদ (দিন)" />
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-green" style="flex:1;" onclick="submitAddUser()">ইউজার তৈরি করুন</button>
+        <button class="btn btn-slate" onclick="closeAddUserModal()">বাতিল</button>
+      </div>
     </div>
+  </div>
 
-    <script>
-        let adminPass = '';
-        let appData = {};
-        let tempQrBase64 = '';
+  <script>
+    let adminPass = localStorage.getItem('nexus_admin_pass') || '';
+    let dashData = null;
 
-        const viewTitles = {
-            'dashboard': 'ড্যাশবোর্ড ওভারভিউ',
-            'users-all': 'সকল ইউজার লিস্ট',
-            'users-banned': 'ব্যানকৃত ইউজার (Banned)',
-            'login-history': 'লগ-ইন হিস্ট্রি',
-            'session-check': 'মেসেজ ও সেশন চেক বার',
-            'payments-history': 'পেমেন্ট হিস্ট্রি',
-            'payments-settings': 'পেমেন্ট নাম্বার ও বাংলা QR',
-            'subscriptions': 'সাবস্ক্রিপশন ও ফ্রি ট্রায়াল',
-            'referrals': 'রেফারেল সিস্টেম',
-            'notices': 'নোটিশ বার ম্যানেজমেন্ট',
-            'settings-general': 'জেনারেল ও ব্যাকগ্রাউন্ড সেটিংস',
-            'settings-security': 'অ্যাডমিন পাসওয়ার্ড সিকিউরিটি'
-        };
+    if (adminPass) {
+      loadDashboard();
+    }
 
-        async function loginAdmin() {
-            adminPass = document.getElementById('admin-pass-input').value;
-            const ok = await refreshData();
-            if (ok) {
-                document.getElementById('admin-login-view').classList.add('hidden');
-                document.getElementById('admin-app').classList.remove('hidden');
-            } else {
-                alert('ভুল অ্যাডমিন পাসওয়ার্ড!');
-            }
+    async function adminLogin() {
+      const pass = document.getElementById('adminPassInput').value.trim();
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        adminPass = pass;
+        localStorage.setItem('nexus_admin_pass', pass);
+        loadDashboard();
+      } else {
+        document.getElementById('adminLoginErr').textContent = data.error || 'ভুল পাসওয়ার্ড';
+      }
+    }
+
+    function adminLogout() {
+      localStorage.removeItem('nexus_admin_pass');
+      location.reload();
+    }
+
+    async function loadDashboard() {
+      const res = await fetch('/api/admin/dashboard', {
+        headers: { 'x-admin-password': adminPass }
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        localStorage.removeItem('nexus_admin_pass');
+        return;
+      }
+      dashData = data;
+      document.getElementById('adminLoginView').classList.add('hidden');
+      document.getElementById('adminAppView').classList.remove('hidden');
+
+      const badge = document.getElementById('dbStatusBadge');
+      if (data.dbMode === 'mongodb') {
+        badge.className = 'db-badge db-mongo';
+        badge.textContent = `● MongoDB Atlas (${data.dbName})`;
+      } else {
+        badge.className = 'db-badge db-local';
+        badge.textContent = '● Local JSON Mode';
+      }
+
+      const s = data.stats;
+      document.getElementById('stTotalUsers').textContent = s.totalUsers;
+      document.getElementById('stSubBreakdown').textContent = `QR: ${s.qrUsers} | নাম্বার/ম্যানুয়াল: ${s.manualOrPhoneUsers}`;
+      document.getElementById('stWaUsers').textContent = s.waUsers;
+      document.getElementById('stWaToday').textContent = `আজকে নতুন: +${s.waToday}`;
+      document.getElementById('stTgUsers').textContent = s.tgUsers;
+      document.getElementById('stTgToday').textContent = `আজকে নতুন: +${s.tgToday}`;
+      document.getElementById('stActiveSubs').textContent = s.activeSubs;
+      document.getElementById('stBannedUsers').textContent = s.bannedUsers;
+      document.getElementById('stRevenue').textContent = `৳${s.totalRevenue}`;
+      document.getElementById('stReferrals').textContent = s.totalReferrals;
+      document.getElementById('stTodayLogins').textContent = s.todayLogins;
+
+      // Recent Logins
+      document.getElementById('recentLoginsBody').innerHTML = (data.loginHistory || []).slice(0, 15).map((l) => `
+        <tr>
+          <td>+${l.phone || l.userId}</td>
+          <td>${(l.platform || '').toUpperCase()}</td>
+          <td>${l.method}</td>
+          <td>${new Date(l.timestamp).toLocaleString('bn-BD')}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" style="color:#64748b;">কোনো লগ-ইন তথ্য নেই</td></tr>';
+
+      renderUsersTable();
+      populateMessageUserDropdown();
+      renderPaymentsTable();
+      populateSettingsForms();
+    }
+
+    function renderUsersTable() {
+      if (!dashData) return;
+      const q = (document.getElementById('userSearchInput').value || '').toLowerCase();
+      const filtered = (dashData.users || []).filter((u) =>
+        (u.phone || '').includes(q) || (u.name || '').toLowerCase().includes(q)
+      );
+      document.getElementById('usersTableBody').innerHTML = filtered.map((u) => {
+        const exp = new Date(u.expiresAt).toLocaleDateString('bn-BD');
+        const isConn = u.sessionStatus === 'connected';
+        return `
+          <tr>
+            <td><b>${u.name}</b><br><span style="color:#94a3b8;">+${u.phone}</span></td>
+            <td>${u.platform.toUpperCase()}</td>
+            <td><span style="color:${isConn ? '#4ade80' : '#f87171'};">${isConn ? '● Connected' : '○ Offline'}</span></td>
+            <td>${u.planName}<br><span style="font-size:12px; color:#94a3b8;">${exp}</span></td>
+            <td style="display:flex; gap:4px; flex-wrap:wrap;">
+              <button class="btn btn-blue btn-sm" onclick="inspectUserMsg('${u.userId}')">মেসেজ</button>
+              <button class="btn btn-green btn-sm" onclick="userAction('${u.userId}', 'extend', 30)">+৩০দিন</button>
+              <button class="btn btn-slate btn-sm" onclick="userAction('${u.userId}', '${u.status === 'banned' ? 'unban' : 'ban'}')">${u.status === 'banned' ? 'আনব্যান' : 'ব্যান'}</button>
+              <button class="btn btn-red btn-sm" onclick="userAction('${u.userId}', 'delete')">ডিলিট</button>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="5" style="color:#64748b;">কোনো ইউজার পাওয়া যায়নি</td></tr>';
+    }
+
+    async function userAction(userId, action, days = 30) {
+      if (action === 'delete' && !confirm('নিশ্চিতভাবে এই ইউজার ডিলিট করবেন?')) return;
+      await fetch(`/api/admin/users/${userId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        body: JSON.stringify({ action, days })
+      });
+      loadDashboard();
+    }
+
+    function populateMessageUserDropdown() {
+      const sel = document.getElementById('msgUserSelect');
+      sel.innerHTML = (dashData.users || []).map((u) =>
+        `<option value="${u.userId}">${u.name} (+${u.phone}) — ${u.platform.toUpperCase()}</option>`
+      ).join('');
+    }
+
+    function inspectUserMsg(userId) {
+      document.getElementById('msgUserSelect').value = userId;
+      switchSection('messages');
+      loadUserMessages();
+    }
+
+    async function loadUserMessages() {
+      const userId = document.getElementById('msgUserSelect').value;
+      if (!userId) return;
+      const res = await fetch(`/api/admin/messages/${userId}`, {
+        headers: { 'x-admin-password': adminPass }
+      });
+      const data = await res.json();
+      const statusBox = document.getElementById('liveSessionStatusBox');
+      statusBox.innerHTML = data.isLiveSocket
+        ? '<span style="color:#4ade80;">● লাইভ সেশন সচল আছে (নতুন মেসেজ/OTP অটোমেটিক সিঙ্ক হচ্ছে)</span>'
+        : '<span style="color:#facc15;">○ সেশনটি বর্তমানে অফলাইনে আছে (আগের সেভ করা মেসেজ নিচে দেখানো হচ্ছে)</span>';
+
+      const feed = document.getElementById('messagesFeed');
+      feed.innerHTML = (data.messages || []).map((m) => `
+        <div class="msg-item">
+          <div class="msg-meta">
+            <span>${m.fromMe ? '📤 প্রেরিত' : '📥 প্রাপক'}: <b>${m.senderName || m.sender}</b> (${m.sender})</span>
+            <span>${new Date(m.timestamp).toLocaleString('bn-BD')}</span>
+          </div>
+          <div class="msg-body">${escapeHtml(m.text)}</div>
+        </div>
+      `).join('') || '<div style="color:#64748b;">এই অ্যাকাউন্টে এখনো কোনো ইনকামিং মেসেজ রেকর্ড হয়নি।</div>';
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function renderPaymentsTable() {
+      document.getElementById('paymentsTableBody').innerHTML = (dashData.payments || []).map((p) => `
+        <tr>
+          <td><b>${p.trxId}</b></td>
+          <td>${p.userId}</td>
+          <td>${p.planName} (৳${p.amount})</td>
+          <td>${p.method}</td>
+          <td>${p.status}</td>
+          <td>
+            ${p.status === 'pending' ? `
+              <button class="btn btn-green btn-sm" onclick="paymentAction('${p.trxId}', 'approve')">Approve</button>
+              <button class="btn btn-red btn-sm" onclick="paymentAction('${p.trxId}', 'reject')">Reject</button>
+            ` : '-'}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" style="color:#64748b;">কোনো পেমেন্ট নেই</td></tr>';
+    }
+
+    async function paymentAction(trxId, action) {
+      await fetch(`/api/admin/payments/${trxId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        body: JSON.stringify({ action })
+      });
+      loadDashboard();
+    }
+
+    function populateSettingsForms() {
+      const s = dashData.settings || {};
+      const nums = s.paymentNumbers || {};
+      document.getElementById('payBkash').value = nums.bkash || '';
+      document.getElementById('payNagad').value = nums.nagad || '';
+      document.getElementById('payRocket').value = nums.rocket || '';
+      document.getElementById('payQrUrl').value = nums.banglaQrUrl || '';
+      document.getElementById('trialDaysInput').value = s.freeTrialDays || 3;
+      document.getElementById('refBonusInput').value = s.referralBonusDays || 2;
+      document.getElementById('noticeEnabledSelect').value = String(s.noticeEnabled !== false);
+      document.getElementById('noticeTextInput').value = s.noticeText || '';
+      document.getElementById('setSiteTitle').value = s.siteTitle || 'NexusPortal Pro';
+      document.getElementById('setSiteSubtitle').value = s.siteSubtitle || '';
+      document.getElementById('setBgUrl').value = s.bgUrl || '';
+      document.getElementById('setTermsText').value = s.termsText || '';
+      document.getElementById('setAdScript').value = s.adScript || '';
+
+      document.getElementById('plansListBox').innerHTML = (s.plans || []).map((pl, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:8px 12px; border-radius:8px; margin-bottom:6px;">
+          <span><b>${pl.name}</b> — ${pl.days} দিন — ৳${pl.price}</span>
+          <button class="btn btn-red btn-sm" onclick="removePlan(${i})">মুছুন</button>
+        </div>
+      `).join('');
+    }
+
+    async function updateSettings(payload) {
+      await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        body: JSON.stringify(payload)
+      });
+      alert('✅ সেটিংস সেভ হয়েছে!');
+      loadDashboard();
+    }
+
+    function savePaymentNumbers() {
+      updateSettings({
+        paymentNumbers: {
+          bkash: document.getElementById('payBkash').value.trim(),
+          nagad: document.getElementById('payNagad').value.trim(),
+          rocket: document.getElementById('payRocket').value.trim(),
+          banglaQrUrl: document.getElementById('payQrUrl').value.trim()
         }
+      });
+    }
 
-        async function refreshData() {
-            const res = await fetch('/api/admin/dashboard', {
-                headers: { 'x-admin-pass': adminPass }
-            });
-            if (!res.ok) return false;
-            appData = await res.json();
-            renderAllViews();
-            return true;
-        }
+    function saveTrialDays() {
+      updateSettings({ freeTrialDays: Number(document.getElementById('trialDaysInput').value) || 3 });
+    }
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-        }
+    function addNewPlan() {
+      const name = document.getElementById('newPlanName').value.trim();
+      const days = Number(document.getElementById('newPlanDays').value);
+      const price = Number(document.getElementById('newPlanPrice').value);
+      if (!name || !days) return;
+      const plans = [...(dashData.settings.plans || []), { id: 'plan_' + Date.now(), name, days, price }];
+      updateSettings({ plans });
+    }
 
-        function toggleSubmenu(id) {
-            document.getElementById(id).classList.toggle('hidden');
-        }
+    function removePlan(idx) {
+      const plans = (dashData.settings.plans || []).filter((_, i) => i !== idx);
+      updateSettings({ plans });
+    }
 
-        function switchView(viewName, platformFilter = null) {
-            Object.keys(viewTitles).forEach(k => {
-                const sec = document.getElementById('view-' + k);
-                if (sec) sec.classList.add('hidden');
-                const nav = document.getElementById('nav-' + k);
-                if (nav) nav.classList.remove('active');
-            });
+    function saveRefBonus() {
+      updateSettings({ referralBonusDays: Number(document.getElementById('refBonusInput').value) || 2 });
+    }
 
-            const targetSec = document.getElementById('view-' + viewName);
-            if (targetSec) targetSec.classList.remove('hidden');
-            const targetNav = document.getElementById('nav-' + viewName);
-            if (targetNav) targetNav.classList.add('active');
+    function saveNotice() {
+      updateSettings({
+        noticeEnabled: document.getElementById('noticeEnabledSelect').value === 'true',
+        noticeText: document.getElementById('noticeTextInput').value
+      });
+    }
 
-            document.getElementById('page-heading').innerText = viewTitles[viewName] || 'Dashboard';
+    function saveGeneralSettings() {
+      const payload = {
+        siteTitle: document.getElementById('setSiteTitle').value.trim(),
+        siteSubtitle: document.getElementById('setSiteSubtitle').value.trim(),
+        bgUrl: document.getElementById('setBgUrl').value.trim(),
+        termsText: document.getElementById('setTermsText').value,
+        adScript: document.getElementById('setAdScript').value
+      };
+      const newPass = document.getElementById('setNewAdminPass').value.trim();
+      if (newPass) {
+        payload.customAdminPassword = newPass;
+        adminPass = newPass;
+        localStorage.setItem('nexus_admin_pass', newPass);
+      }
+      updateSettings(payload);
+    }
 
-            if (platformFilter && viewName === 'users-all') {
-                document.getElementById('user-platform-filter').value = platformFilter;
-                renderUsersTable();
-            }
+    function switchSection(name, el) {
+      ['dashboard', 'users', 'messages', 'payments', 'plans', 'referrals', 'notice', 'settings'].forEach((sec) => {
+        document.getElementById('sec-' + sec).classList.toggle('hidden', sec !== name);
+      });
+      if (el) {
+        document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('pageHeading').textContent = el.textContent.replace(/^[^\s]+\s/, '');
+      }
+      if (name === 'messages') loadUserMessages();
+      document.getElementById('sidebar').classList.remove('open');
+    }
 
-            if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.remove('open');
-            }
-        }
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
 
-        function openAddUserModal() {
-            document.getElementById('add-user-modal').classList.remove('hidden');
-            if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.remove('open');
-            }
-        }
+    function openAddUserModal() { document.getElementById('addUserModal').style.display = 'flex'; }
+    function closeAddUserModal() { document.getElementById('addUserModal').style.display = 'none'; }
 
-        function closeAddUserModal() {
-            document.getElementById('add-user-modal').classList.add('hidden');
-        }
-
-        async function submitManualUser() {
-            const name = document.getElementById('add-user-name').value.trim();
-            const phone = document.getElementById('add-user-phone').value.trim();
-            const platform = document.getElementById('add-user-platform').value;
-            const durationMinutes = Number(document.getElementById('add-user-mins').value);
-            const note = document.getElementById('add-user-note').value.trim();
-
-            if (!phone) return alert('ফোন নাম্বার বা ইউজারনেম দিন!');
-
-            const res = await fetch('/api/admin/users/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ name, phone, platform, durationMinutes, note })
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                return alert('ত্রুটি: ' + (data.error || 'ইউজার তৈরি করা যায়নি'));
-            }
-
-            alert(`সফলভাবে ইউজার তৈরি হয়েছে! User ID: ${data.user.id}`);
-            document.getElementById('add-user-name').value = '';
-            document.getElementById('add-user-phone').value = '';
-            document.getElementById('add-user-note').value = '';
-            closeAddUserModal();
-            await refreshData();
-            switchView('users-all');
-        }
-
-        function handleFileBase64(input, type) {
-            const file = input.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                if (type === 'qr') {
-                    tempQrBase64 = reader.result;
-                    document.getElementById('qr-preview-wrap').innerHTML = `<img src="${tempQrBase64}" style="width:140px;border-radius:8px;">`;
-                } else if (type === 'bg') {
-                    document.getElementById('cfg-bg-url').value = reader.result;
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function renderAllViews() {
-            const s = appData.stats;
-            const cfg = appData.settings;
-            const db = appData.dbStatus || {};
-            document.getElementById('admin-brand-title').innerText = cfg.appName || 'Nexus Admin';
-
-            const dbPill = document.getElementById('db-status-pill');
-            if (db.connected) {
-                dbPill.className = 'db-pill db-ok';
-                dbPill.innerText = `🟢 MongoDB Atlas (${db.dbName})`;
-            } else {
-                dbPill.className = 'db-pill db-warn';
-                dbPill.innerText = `🟡 Local JSON Mode`;
-            }
-
-            // 1. Clickable Dashboard KPI Cards
-            document.getElementById('kpi-container').innerHTML = `
-                <div class="kpi-card" onclick="switchView('users-all', 'all')">
-                    <div class="kpi-label">মোট ইউজার (Total)</div>
-                    <div class="kpi-val">${s.totalUsers}</div>
-                    <div class="kpi-sub">QR: ${s.qrUsers} | নাম্বার/ম্যানুয়াল: ${s.phoneUsers} →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('users-all', 'whatsapp')">
-                    <div class="kpi-label">WhatsApp ইউজার</div>
-                    <div class="kpi-val" style="color:#4ade80;">${s.waUsers}</div>
-                    <div class="kpi-sub">আজকে নতুন: +${s.todayWaUsers} →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('users-all', 'telegram')">
-                    <div class="kpi-label">Telegram ইউজার</div>
-                    <div class="kpi-val" style="color:#38bdf8;">${s.tgUsers}</div>
-                    <div class="kpi-sub">আজকে নতুন: +${s.todayTgUsers} →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('subscriptions')">
-                    <div class="kpi-label">সক্রিয় সাবস্ক্রিপশন</div>
-                    <div class="kpi-val" style="color:#fbbf24;">${s.activeSubs}</div>
-                    <div class="kpi-sub">প্যাকেজ ম্যানেজ করুন →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('users-banned')">
-                    <div class="kpi-label">ব্যানকৃত ইউজার</div>
-                    <div class="kpi-val" style="color:#f87171;">${s.bannedUsers}</div>
-                    <div class="kpi-sub">ব্যান লিস্ট দেখুন →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('payments-history')">
-                    <div class="kpi-label">মোট পেমেন্ট আয়</div>
-                    <div class="kpi-val" style="color:#34d399;">৳${s.totalRevenue}</div>
-                    <div class="kpi-sub">পেমেন্ট হিস্ট্রি দেখুন →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('referrals')">
-                    <div class="kpi-label">মোট রেফারেল</div>
-                    <div class="kpi-val" style="color:#c084fc;">${s.totalReferrals}</div>
-                    <div class="kpi-sub">রেফারেল রিপোর্ট →</div>
-                </div>
-                <div class="kpi-card" onclick="switchView('login-history')">
-                    <div class="kpi-label">আজকের লগ-ইন</div>
-                    <div class="kpi-val">${s.todayLogins}</div>
-                    <div class="kpi-sub">লগ-ইন হিস্ট্রি →</div>
-                </div>
-            `;
-
-            // Dashboard Recent Tables
-            document.getElementById('dash-recent-logins').innerHTML = appData.loginHistory.slice(0, 5).map(l => `
-                <tr>
-                    <td>${new Date(l.timestamp).toLocaleTimeString()}</td>
-                    <td>${l.phone}</td>
-                    <td>${l.platform}</td>
-                    <td>${l.method}</td>
-                    <td><span class="badge ${l.status === 'success' ? 'badge-active' : 'badge-banned'}">${l.status}</span></td>
-                </tr>
-            `).join('');
-
-            document.getElementById('dash-recent-payments').innerHTML = appData.payments.slice(0, 5).map(p => `
-                <tr><td>${p.userId}</td><td>${p.planName}</td><td>৳${p.amount}</td><td>${p.trxId}</td></tr>
-            `).join('');
-
-            // Users Tables
-            renderUsersTable();
-
-            const bannedList = appData.users.filter(u => u.status === 'banned');
-            document.getElementById('banned-users-tbody').innerHTML = bannedList.map(u => `
-                <tr>
-                    <td>${u.id}</td>
-                    <td>${u.phone}</td>
-                    <td>${u.platform}</td>
-                    <td style="color:#fca5a5;">${u.banReason || 'N/A'}</td>
-                    <td><button class="btn btn-green" onclick="unbanUser('${u.id}')">Unban করুন</button></td>
-                </tr>
-            `).join('') || '<tr><td colspan="5">কোনো ব্যানকৃত ইউজার নেই।</td></tr>';
-
-            // Login History Table
-            document.getElementById('login-history-tbody').innerHTML = appData.loginHistory.map(l => `
-                <tr>
-                    <td>${new Date(l.timestamp).toLocaleString()}</td>
-                    <td>${l.userId}</td>
-                    <td>${l.phone}</td>
-                    <td>${l.platform}</td>
-                    <td>${l.method}</td>
-                    <td>${l.ip}</td>
-                    <td><span class="badge ${l.status === 'success' ? 'badge-active' : 'badge-banned'}">${l.status}</span></td>
-                </tr>
-            `).join('');
-
-            // Session Inspect Select
-            document.getElementById('inspect-user-select').innerHTML = appData.users.map(u => `
-                <option value="${u.id}">${u.id} - ${u.phone} (${u.platform})</option>
-            `).join('');
-
-            // Payments History
-            document.getElementById('payments-history-tbody').innerHTML = appData.payments.map(p => `
-                <tr>
-                    <td>${p.id}</td><td>${p.userId}</td><td>${p.userPhone}</td><td>${p.planName}</td>
-                    <td>৳${p.amount}</td><td>${p.senderOrRef}</td><td>${p.trxId}</td>
-                    <td>${new Date(p.createdAt).toLocaleString()}</td>
-                </tr>
-            `).join('');
-
-            // Plans Table
-            document.getElementById('plans-tbody').innerHTML = appData.plans.map(p => `
-                <tr>
-                    <td>${p.name}</td><td>${p.durationMinutes} মিনিট</td><td>৳${p.price}</td>
-                    <td><button class="btn btn-red" onclick="deletePlan('${p.id}')">মুছুন</button></td>
-                </tr>
-            `).join('');
-
-            // Referrals Table
-            const refUsers = appData.users.filter(u => (u.referralCount || 0) > 0 || u.referralCode);
-            document.getElementById('referrals-tbody').innerHTML = refUsers.map(u => `
-                <tr>
-                    <td>${u.id}</td><td>${u.phone}</td><td><b>${u.referralCode || '-'}</b></td>
-                    <td>${u.referralCount || 0} জন</td><td>${u.referralBonusEarned || 0} মিনিট</td>
-                </tr>
-            `).join('');
-
-            // Notices Target & List
-            document.getElementById('notice-target-select').innerHTML = `
-                <option value="all">সকল ইউজার (All Users)</option>
-                <option value="whatsapp">শুধুমাত্র WhatsApp ইউজার</option>
-                <option value="telegram">শুধুমাত্র Telegram ইউজার</option>
-                ${appData.users.map(u => `<option value="${u.id}">নির্দিষ্ট ইউজার: ${u.id} (${u.phone})</option>`).join('')}
-            `;
-            document.getElementById('notices-tbody').innerHTML = appData.notices.map(n => `
-                <tr>
-                    <td>${n.target}</td><td>${n.title}</td><td>${n.message}</td>
-                    <td><button class="btn btn-red" onclick="deleteNotice('${n.id}')">মুছুন</button></td>
-                </tr>
-            `).join('');
-
-            // Populate Settings Inputs
-            document.getElementById('cfg-app-name').value = cfg.appName || '';
-            document.getElementById('cfg-bg-url').value = cfg.bgImage || '';
-            document.getElementById('cfg-redirect-url').value = cfg.redirectUrl || '';
-            document.getElementById('cfg-trial-mins').value = cfg.freeTrialMinutes || 15;
-            document.getElementById('cfg-en-ref').checked = Boolean(cfg.enableReferral);
-            document.getElementById('cfg-ref-bonus').value = cfg.referralBonusMinutes || 30;
-            document.getElementById('cfg-pay-num').value = cfg.paymentNumber || '';
-            document.getElementById('cfg-pay-note').value = cfg.paymentNote || '';
-            document.getElementById('cfg-en-wa').checked = Boolean(cfg.enableWhatsApp);
-            document.getElementById('cfg-en-tg').checked = Boolean(cfg.enableTelegram);
-            tempQrBase64 = cfg.banglaQrImage || '';
-            if (tempQrBase64) {
-                document.getElementById('qr-preview-wrap').innerHTML = `<img src="${tempQrBase64}" style="width:140px;border-radius:8px;">`;
-            }
-        }
-
-        function renderUsersTable() {
-            const q = document.getElementById('user-search-input').value.toLowerCase();
-            const plat = document.getElementById('user-platform-filter').value;
-            const filtered = appData.users.filter(u => {
-                const matchText = u.id.toLowerCase().includes(q) || u.phone.toLowerCase().includes(q) || (u.name || '').toLowerCase().includes(q);
-                const matchPlat = plat === 'all' || u.platform === plat;
-                return matchText && matchPlat;
-            });
-
-            document.getElementById('all-users-tbody').innerHTML = filtered.map(u => `
-                <tr>
-                    <td><b>${u.id}</b></td>
-                    <td>${u.name || '<span style="color:#64748b;">-</span>'}</td>
-                    <td>${u.phone}</td>
-                    <td><span class="badge ${u.platform === 'whatsapp' ? 'badge-wa' : 'badge-tg'}">${u.platform}</span></td>
-                    <td>${u.method}</td>
-                    <td>${new Date(u.expiresAt).toLocaleString()}</td>
-                    <td><span class="badge ${u.status === 'active' ? 'badge-active' : 'badge-banned'}">${u.status}</span></td>
-                    <td>
-                        <button class="btn" onclick="openUserModal('${u.id}')">প্রোফাইল / এডিট</button>
-                        ${u.status === 'active'
-                            ? `<button class="btn btn-amber" onclick="banUserPrompt('${u.id}')">Ban</button>`
-                            : `<button class="btn btn-green" onclick="unbanUser('${u.id}')">Unban</button>`}
-                        <button class="btn btn-red" onclick="removeUser('${u.id}')">Delete</button>
-                    </td>
-                </tr>
-            `).join('') || '<tr><td colspan="8">কোনো ইউজার পাওয়া যায়নি।</td></tr>';
-        }
-
-        function openUserModal(userId) {
-            const u = appData.users.find(x => x.id === userId);
-            if (!u) return;
-            document.getElementById('user-modal-body').innerHTML = `
-                <div><b>User ID:</b> ${u.id}</div>
-                <div><b>প্ল্যাটফর্ম ও মেথড:</b> ${u.platform.toUpperCase()} (${u.method})</div>
-                <div><b>স্ট্যাটাস:</b> ${u.status.toUpperCase()} ${u.banReason ? '(' + u.banReason + ')' : ''}</div>
-                <div><b>রেফারেল কোড:</b> ${u.referralCode || '-'} | <b>রেফার করেছেন:</b> ${u.referralCount || 0} জন</div>
-                <div><b>তৈরির তারিখ:</b> ${new Date(u.createdAt).toLocaleString()}</div>
-                <div><b>সর্বশেষ লগ-ইন:</b> ${new Date(u.lastLogin).toLocaleString()}</div>
-                <div><b>সর্বশেষ IP:</b> ${u.lastIp || 'N/A'}</div>
-                <div><b>মেয়াদ শেষ:</b> <span style="color:#fbbf24;">${new Date(u.expiresAt).toLocaleString()}</span></div>
-                <hr style="border-color:#334155;">
-
-                <label>ইউজারের নাম আপডেট করুন:</label>
-                <input type="text" id="modal-edit-name" value="${u.name || ''}" placeholder="নাম লিখুন...">
-                <label>অ্যাডমিন নোট:</label>
-                <input type="text" id="modal-edit-note" value="${u.note || ''}" placeholder="নোট লিখুন...">
-                <button class="btn" style="margin-bottom:12px;" onclick="saveUserInfo('${u.id}')">তথ্য সেভ করুন</button>
-
-                <hr style="border-color:#334155;">
-                <label>সময় যোগ করুন (মিনিটে):</label>
-                <div class="preset-row">
-                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=60">+১ ঘণ্টা</button>
-                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=1440">+১ দিন</button>
-                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=10080">+৭ দিন</button>
-                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=43200">+৩০ দিন</button>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <input type="number" id="modal-add-mins" value="60" style="margin:0;">
-                    <button class="btn btn-green" onclick="addUserMinutes('${u.id}')">+ সময় যোগ করুন</button>
-                </div>
-                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="btn" onclick="closeUserModal(); document.getElementById('inspect-user-select').value='${u.id}'; switchView('session-check');">মেসেজ / সেশন চেক করুন</button>
-                    ${u.status === 'active'
-                        ? `<button class="btn btn-red" onclick="banUserPrompt('${u.id}'); closeUserModal();">ইউজার ব্যান করুন</button>`
-                        : `<button class="btn btn-green" onclick="unbanUser('${u.id}'); closeUserModal();">আনব্যান করুন</button>`}
-                </div>
-            `;
-            document.getElementById('user-detail-modal').classList.remove('hidden');
-        }
-
-        function closeUserModal() {
-            document.getElementById('user-detail-modal').classList.add('hidden');
-        }
-
-        async function saveUserInfo(userId) {
-            const name = document.getElementById('modal-edit-name').value;
-            const note = document.getElementById('modal-edit-note').value;
-            await fetch('/api/admin/user-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ userId, name, note })
-            });
-            alert('ইউজারের তথ্য আপডেট হয়েছে!');
-            await refreshData();
-            openUserModal(userId);
-        }
-
-        async function addUserMinutes(userId) {
-            const mins = Number(document.getElementById('modal-add-mins').value);
-            if (!mins) return;
-            await fetch('/api/admin/user-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ userId, addMinutes: mins })
-            });
-            alert('সময় যোগ করা হয়েছে!');
-            await refreshData();
-            openUserModal(userId);
-        }
-
-        async function banUserPrompt(userId) {
-            const reason = prompt('ব্যান করার কারণ লিখুন:', 'নিয়ম ভঙ্গ করার কারণে ব্যান করা হলো।');
-            if (reason === null) return;
-            await fetch('/api/admin/user-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ userId, status: 'banned', banReason: reason })
-            });
-            await refreshData();
-        }
-
-        async function unbanUser(userId) {
-            await fetch('/api/admin/user-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ userId, status: 'active' })
-            });
-            await refreshData();
-        }
-
-        async function removeUser(userId) {
-            if (!confirm('এই ইউজারকে স্থায়ীভাবে ডিলিট করবেন?')) return;
-            await fetch('/api/admin/user-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ userId, deleteUser: true })
-            });
-            await refreshData();
-        }
-
-        async function saveAllSettings() {
-            const payload = {
-                appName: document.getElementById('cfg-app-name').value,
-                bgImage: document.getElementById('cfg-bg-url').value,
-                redirectUrl: document.getElementById('cfg-redirect-url').value,
-                freeTrialMinutes: Number(document.getElementById('cfg-trial-mins').value),
-                enableReferral: document.getElementById('cfg-en-ref').checked,
-                referralBonusMinutes: Number(document.getElementById('cfg-ref-bonus').value),
-                paymentNumber: document.getElementById('cfg-pay-num').value,
-                paymentNote: document.getElementById('cfg-pay-note').value,
-                banglaQrImage: tempQrBase64,
-                enableWhatsApp: document.getElementById('cfg-en-wa').checked,
-                enableTelegram: document.getElementById('cfg-en-tg').checked
-            };
-            await fetch('/api/admin/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify(payload)
-            });
-            alert('সেটিংস সফলভাবে সেভ হয়েছে!');
-            await refreshData();
-        }
-
-        async function updateAdminPassword() {
-            const newPass = document.getElementById('cfg-admin-pass').value.trim();
-            if (newPass.length < 4) return alert('পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে।');
-            await fetch('/api/admin/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ adminPassword: newPass })
-            });
-            adminPass = newPass;
-            alert('অ্যাডমিন পাসওয়ার্ড পরিবর্তন হয়েছে!');
-        }
-
-        async function createPlan() {
-            const name = document.getElementById('new-plan-name').value.trim();
-            const durationMinutes = Number(document.getElementById('new-plan-mins').value);
-            const price = Number(document.getElementById('new-plan-price').value);
-            if (!name || !durationMinutes) return alert('সঠিক তথ্য দিন।');
-            await fetch('/api/admin/plans', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ action: 'add', plan: { name, durationMinutes, price } })
-            });
-            document.getElementById('new-plan-name').value = '';
-            document.getElementById('new-plan-mins').value = '';
-            document.getElementById('new-plan-price').value = '';
-            await refreshData();
-        }
-
-        async function deletePlan(id) {
-            await fetch('/api/admin/plans', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ action: 'delete', plan: { id } })
-            });
-            await refreshData();
-        }
-
-        async function broadcastNotice() {
-            const target = document.getElementById('notice-target-select').value;
-            const title = document.getElementById('notice-title-input').value.trim();
-            const message = document.getElementById('notice-msg-input').value.trim();
-            if (!title || !message) return alert('শিরোনাম ও বার্তা লিখুন।');
-            await fetch('/api/admin/notice', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ target, title, message })
-            });
-            alert('নোটিশ পাঠানো হয়েছে!');
-            document.getElementById('notice-title-input').value = '';
-            document.getElementById('notice-msg-input').value = '';
-            await refreshData();
-        }
-
-        async function deleteNotice(id) {
-            await fetch('/api/admin/notice', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ action: 'delete', id })
-            });
-            await refreshData();
-        }
-
-        async function inspectUserSession() {
-            const userId = document.getElementById('inspect-user-select').value;
-            const testReceiver = document.getElementById('test-receiver').value.trim();
-            const testText = document.getElementById('test-msg-text').value.trim();
-            const outBox = document.getElementById('inspect-result-box');
-            outBox.innerHTML = 'লোড হচ্ছে...';
-
-            const res = await fetch('/api/admin/session-inspect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
-                body: JSON.stringify({ userId, testReceiver, testText })
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                outBox.innerHTML = `<div style="color:#f87171;">ত্রুটি: ${data.error}</div>`;
-                return;
-            }
-            outBox.innerHTML = `
-                <div style="color:#4ade80; margin-bottom:8px;"><b>${data.platform} (${data.phone})</b> - সাম্প্রতিক চ্যাটসমূহ:</div>
-                ${data.recent.map(c => `
-                    <div style="background:#0f172a; padding:10px; border-radius:8px; margin-bottom:6px; border:1px solid #334155;">
-                        <div style="font-weight:bold; color:#38bdf8;">${c.title}</div>
-                        <div style="font-size:13px; color:#cbd5e1;">${c.lastMessage}</div>
-                    </div>
-                `).join('')}
-            `;
-        }
-    </script>
+    async function submitAddUser() {
+      const phone = document.getElementById('addPhone').value.trim();
+      const name = document.getElementById('addName').value.trim();
+      const platform = document.getElementById('addPlatform').value;
+      const days = Number(document.getElementById('addDays').value) || 30;
+      await fetch('/api/admin/users/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        body: JSON.stringify({ phone, name, platform, days })
+      });
+      closeAddUserModal();
+      loadDashboard();
+    }
+  </script>
 </body>
 </html>

@@ -1,640 +1,700 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Portal</title>
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background-color: #0f172a;
-            background-size: cover;
-            background-position: center;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 16px;
-        }
-        .login-card {
-            width: 100%;
-            max-width: 430px;
-            background: rgba(15, 23, 42, 0.88);
-            color: #f8fafc;
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 20px;
-            padding: 26px;
-            box-shadow: 0 20px 45px rgba(0,0,0,0.55);
-            backdrop-filter: blur(12px);
-            text-align: center;
-        }
-        .brand-title { font-size: 22px; font-weight: 700; margin: 0 0 4px; color: #38bdf8; }
-        .brand-sub { font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 12px; background: #1e293b; padding: 5px; border-radius: 12px; }
-        .tab-btn {
-            flex: 1; padding: 10px; border: none; border-radius: 9px;
-            font-weight: 600; cursor: pointer; background: transparent; color: #94a3b8; transition: 0.2s;
-        }
-        .tab-btn.active.wa { background: #16a34a; color: #fff; }
-        .tab-btn.active.tg { background: #0284c7; color: #fff; }
-        .tab-btn.active.mode { background: #334155; color: #fff; }
-        input {
-            width: 100%; padding: 12px 14px; margin: 7px 0;
-            border: 1px solid #334155; border-radius: 11px; font-size: 14px;
-            background: #1e293b; color: #fff; outline: none;
-        }
-        input:focus { border-color: #38bdf8; }
-        .btn {
-            width: 100%; padding: 12px; border: none; border-radius: 11px;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff;
-            font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 8px;
-        }
-        .btn-green { background: linear-gradient(135deg, #16a34a, #15803d); }
-        .btn-amber { background: linear-gradient(135deg, #d97706, #b45309); }
-        .hidden { display: none !important; }
-        #qr-img { width: 215px; height: 215px; margin: 12px auto; border-radius: 12px; background: #fff; padding: 8px; }
-        .code-box {
-            font-size: 22px; font-weight: 800; letter-spacing: 3px; color: #38bdf8;
-            background: #1e293b; border: 1px dashed #38bdf8; padding: 12px; border-radius: 11px; margin: 10px 0;
-        }
-        .status { margin-top: 10px; font-size: 13px; color: #fca5a5; min-height: 18px; }
-
-        /* Workspace */
-        #app-view { position: fixed; inset: 0; background: #0f172a; display: flex; flex-direction: column; }
-        .topbar {
-            background: #1e293b; color: #fff; padding: 8px 12px; border-bottom: 1px solid #334155;
-            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px;
-        }
-        .badge { background: #f59e0b; color: #0f172a; padding: 4px 9px; border-radius: 7px; font-weight: 700; }
-        .top-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-        .top-btn { padding: 6px 10px; border-radius: 7px; border: none; font-weight: 600; cursor: pointer; font-size: 12px; color: #fff; }
-        .notice-bar {
-            background: linear-gradient(90deg, #fef08a, #fde047); color: #713f12;
-            padding: 7px 12px; font-size: 13px; font-weight: 600;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        iframe { flex: 1; width: 100%; border: none; background: #fff; }
-
-        /* Modals */
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(2, 6, 23, 0.92);
-            display: flex; justify-content: center; align-items: center; padding: 16px; z-index: 999;
-        }
-        .modal-card {
-            width: 100%; max-width: 470px; background: #1e293b; color: #f8fafc;
-            border: 1px solid #334155; border-radius: 18px; padding: 22px; text-align: center;
-            max-height: 92vh; overflow-y: auto;
-        }
-        .plan-item {
-            border: 1px solid #334155; background: #0f172a; border-radius: 11px; padding: 12px; margin: 8px 0;
-            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-        }
-        .plan-item.selected { border: 2px solid #38bdf8; background: #1e3a8a; }
-        .ref-box {
-            background: #0f172a; border: 1px dashed #38bdf8; padding: 12px; border-radius: 11px;
-            margin: 10px 0; word-break: break-all; font-size: 13px; color: #38bdf8;
-        }
-
-        /* User Profile Styling */
-        .profile-header {
-            display: flex; align-items: center; gap: 14px; text-align: left;
-            background: #0f172a; padding: 14px; border-radius: 14px; border: 1px solid #334155; margin-bottom: 14px;
-        }
-        .avatar-circle {
-            width: 54px; height: 54px; border-radius: 50%;
-            background: linear-gradient(135deg, #0284c7, #6366f1);
-            display: flex; justify-content: center; align-items: center;
-            font-size: 20px; font-weight: 800; color: #fff; flex-shrink: 0;
-        }
-        .info-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; margin-bottom: 14px;
-        }
-        .info-tile {
-            background: #0f172a; padding: 10px; border-radius: 10px; border: 1px solid #334155;
-        }
-        .info-tile-label { font-size: 11px; color: #94a3b8; }
-        .info-tile-val { font-size: 13px; font-weight: 700; color: #f8fafc; margin-top: 2px; word-break: break-all; }
-        .mini-list-item {
-            background: #0f172a; border: 1px solid #334155; border-radius: 9px; padding: 9px 12px;
-            margin-bottom: 6px; text-align: left; font-size: 12px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusPortal Pro — নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Hind Siliguri', sans-serif; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #4338ca 0%, #9333ea 50%, #0891b2 100%);
+      background-size: cover;
+      background-position: center;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .notice-bar {
+      width: 100%;
+      max-width: 480px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      padding: 8px 14px;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      overflow: hidden;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+    .notice-scroll {
+      display: inline-block;
+      padding-left: 100%;
+      animation: marquee 18s linear infinite;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+    .card {
+      width: 100%;
+      max-width: 460px;
+      background: rgba(15, 23, 42, 0.90);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 22px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    .brand-title {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.3px;
+    }
+    .brand-sub {
+      text-align: center;
+      font-size: 14px;
+      color: #cbd5e1;
+      margin-top: 4px;
+      margin-bottom: 22px;
+    }
+    .tab-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(30, 41, 59, 0.85);
+      padding: 5px;
+      border-radius: 14px;
+      margin-bottom: 14px;
+    }
+    .tab-btn {
+      border: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: transparent;
+      color: #cbd5e1;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active-wa { background: #16a34a; color: #ffffff; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4); }
+    .tab-btn.active-tg { background: #0284c7; color: #ffffff; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4); }
+    .tab-btn.active-method { background: #334155; color: #ffffff; }
+    .input-group { margin-bottom: 12px; }
+    .input-field {
+      width: 100%;
+      padding: 13px 15px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(30, 41, 59, 0.85);
+      color: #ffffff;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-field:focus { border-color: #38bdf8; }
+    .terms-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      padding: 10px 12px;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      font-size: 13.5px;
+      color: #e2e8f0;
+      line-height: 1.45;
+      transition: border-color 0.2s;
+    }
+    .terms-box.error-highlight {
+      border-color: #f87171;
+      background: rgba(127, 29, 29, 0.25);
+    }
+    .terms-box input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: #2563eb;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .terms-link {
+      color: #38bdf8;
+      text-decoration: underline;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .primary-btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #2563eb, #3b82f6);
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .primary-btn:hover { opacity: 0.95; }
+    .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .status-area {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 14px;
+      color: #fbbf24;
+    }
+    .auth-result-box {
+      margin-top: 16px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+    }
+    .pairing-code {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #4ade80;
+      background: rgba(15, 23, 42, 0.9);
+      padding: 10px 16px;
+      border-radius: 10px;
+      margin: 10px 0;
+      font-family: monospace;
+      border: 1px dashed #4ade80;
+    }
+    .qr-img {
+      width: 220px;
+      height: 220px;
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 8px;
+      margin: 10px auto;
+      display: block;
+    }
+    .timer-pill {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+    .small-btn {
+      background: #334155;
+      color: #fff;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 999;
+    }
+    .modal-card {
+      width: 100%;
+      max-width: 460px;
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 18px;
+      padding: 20px;
+      color: #f1f5f9;
+    }
+    .modal-body {
+      max-height: 260px;
+      overflow-y: auto;
+      background: #1e293b;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-line;
+      margin: 12px 0;
+      color: #cbd5e1;
+    }
+    /* User Dashboard */
+    .dash-stat {
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .badge-connected {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
 
-    <!-- Login Card -->
-    <div class="login-card" id="login-view">
-        <div class="brand-title" id="brand-name">NexusPortal Pro</div>
-        <div class="brand-sub">নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল</div>
+  <div id="noticeBar" class="notice-bar hidden">
+    <div id="noticeText" class="notice-scroll"></div>
+  </div>
 
-        <div class="tabs">
-            <button class="tab-btn active wa" id="tab-wa" onclick="setPlatform('whatsapp')">WhatsApp</button>
-            <button class="tab-btn tg" id="tab-tg" onclick="setPlatform('telegram')">Telegram</button>
-        </div>
+  <!-- LOGIN / REGISTRATION CARD -->
+  <div id="authCard" class="card">
+    <div id="siteTitle" class="brand-title">NexusPortal Pro</div>
+    <div id="siteSubtitle" class="brand-sub">নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল</div>
 
-        <div class="tabs">
-            <button class="tab-btn active mode" id="tab-phone" onclick="setMode('phone')">নাম্বার দিয়ে</button>
-            <button class="tab-btn mode" id="tab-qr" onclick="setMode('qr')">QR Code দিয়ে</button>
-        </div>
-
-        <div id="phone-box">
-            <input type="text" id="phone-input" placeholder="ফোন নাম্বার (+8801XXXXXXXXX)">
-            <input type="text" id="ref-input" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)">
-            <button class="btn" onclick="sendPhone()">কোড পাঠান / এগিয়ে যান</button>
-
-            <div id="tg-verify-box" class="hidden">
-                <input type="text" id="tg-otp" placeholder="Telegram OTP কোড লিখুন">
-                <input type="password" id="tg-2fa" placeholder="2FA পাসওয়ার্ড (যদি চালু থাকে)">
-                <button class="btn btn-green" onclick="verifyTg()">ভেরিফাই ও লগ-ইন</button>
-            </div>
-
-            <div id="wa-pair-code" class="code-box hidden"></div>
-        </div>
-
-        <div id="qr-box" class="hidden">
-            <input type="text" id="qr-ref-input" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)">
-            <button class="btn" onclick="generateQR()">QR Code তৈরি করুন</button>
-            <img id="qr-img" class="hidden" src="" alt="QR">
-            <button class="btn btn-green hidden" id="dl-qr-btn" onclick="downloadImage(currentQr, currentPlatform + '-qr.png')">QR Code সেভ / ডাউনলোড করুন</button>
-        </div>
-
-        <div class="status" id="login-status"></div>
+    <!-- Platform Tabs -->
+    <div class="tab-row">
+      <button id="tabWa" class="tab-btn active-wa" onclick="selectPlatform('whatsapp')">WhatsApp</button>
+      <button id="tabTg" class="tab-btn" onclick="selectPlatform('telegram')">Telegram</button>
     </div>
 
-    <!-- Main App Workspace -->
-    <div id="app-view" class="hidden">
-        <div class="topbar">
-            <div><b id="topbar-brand" style="color:#38bdf8;">Portal</b> | <span id="topbar-uid"></span></div>
-            <span class="badge">সময় বাকি: <span id="timer-text">--:--</span></span>
-            <div class="top-actions">
-                <button class="top-btn" style="background:#0284c7;" onclick="openProfileModal()">👤 প্রোফাইল</button>
-                <button class="top-btn" id="ref-nav-btn" style="background:#8b5cf6;" onclick="openReferralModal()">🎁 রেফার</button>
-                <button class="top-btn" style="background:#16a34a;" onclick="openPaywall()">💳 প্যাকেজ</button>
-                <button class="top-btn" style="background:#dc2626;" onclick="logoutUser()">লগ-আউট</button>
-            </div>
-        </div>
-        <div id="notice-area" class="notice-bar hidden">
-            <span id="notice-text"></span>
-            <button onclick="this.parentElement.classList.add('hidden')" style="border:none;background:none;font-weight:bold;cursor:pointer;">✕</button>
-        </div>
-        <iframe id="content-frame" src=""></iframe>
+    <!-- Method Tabs -->
+    <div class="tab-row">
+      <button id="tabPhone" class="tab-btn active-method" onclick="selectMethod('phone')">নাম্বার দিয়ে</button>
+      <button id="tabQr" class="tab-btn" onclick="selectMethod('qr')">QR Code দিয়ে</button>
     </div>
 
-    <!-- User Profile Modal -->
-    <div id="profile-modal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3 style="margin:0; color:#38bdf8;">👤 আমার প্রোফাইল</h3>
-                <button class="top-btn" style="background:#475569;" onclick="document.getElementById('profile-modal').classList.add('hidden')">✕ বন্ধ</button>
-            </div>
-
-            <div class="profile-header">
-                <div class="avatar-circle" id="prof-avatar">U</div>
-                <div style="flex:1;">
-                    <div style="font-size:16px; font-weight:700; color:#f8fafc;" id="prof-display-name">User</div>
-                    <div style="font-size:12px; color:#38bdf8;" id="prof-id-line">USR-000000</div>
-                    <div style="font-size:11px; color:#4ade80; margin-top:2px;" id="prof-status-badge">● Active Account</div>
-                </div>
-            </div>
-
-            <!-- Edit Display Name -->
-            <div style="display:flex; gap:8px; margin-bottom:14px;">
-                <input type="text" id="prof-name-input" placeholder="আপনার নাম লিখুন..." style="margin:0; padding:9px 12px;">
-                <button class="btn btn-green" style="width:auto; margin:0; padding:9px 14px; white-space:nowrap;" onclick="saveProfileName()">নাম সেভ</button>
-            </div>
-
-            <!-- Account Details Grid -->
-            <div class="info-grid">
-                <div class="info-tile">
-                    <div class="info-tile-label">ফোন / অ্যাকাউন্ট</div>
-                    <div class="info-tile-val" id="prof-phone">-</div>
-                </div>
-                <div class="info-tile">
-                    <div class="info-tile-label">প্ল্যাটফর্ম ও মেথড</div>
-                    <div class="info-tile-val" id="prof-platform">-</div>
-                </div>
-                <div class="info-tile">
-                    <div class="info-tile-label">সাবস্ক্রিপশন মেয়াদ</div>
-                    <div class="info-tile-val" style="color:#fbbf24;" id="prof-expiry">-</div>
-                </div>
-                <div class="info-tile">
-                    <div class="info-tile-label">রেফারেল ও বোনাস</div>
-                    <div class="info-tile-val" style="color:#c084fc;" id="prof-ref-summary">-</div>
-                </div>
-                <div class="info-tile">
-                    <div class="info-tile-label">অ্যাকাউন্ট তৈরি</div>
-                    <div class="info-tile-val" id="prof-created">-</div>
-                </div>
-                <div class="info-tile">
-                    <div class="info-tile-label">সর্বশেষ IP / লগ-ইন</div>
-                    <div class="info-tile-val" id="prof-ip">-</div>
-                </div>
-            </div>
-
-            <!-- Quick Action Buttons inside Profile -->
-            <div style="display:flex; gap:8px; margin-bottom:16px;">
-                <button class="btn btn-green" style="margin:0;" onclick="document.getElementById('profile-modal').classList.add('hidden'); openPaywall();">💳 সময় বাড়ান / প্যাকেজ কিনুন</button>
-                <button class="btn" style="margin:0; background:#8b5cf6;" onclick="document.getElementById('profile-modal').classList.add('hidden'); openReferralModal();">🎁 রেফার লিংক</button>
-            </div>
-
-            <!-- My Payments History -->
-            <div style="text-align:left; font-size:13px; font-weight:700; color:#94a3b8; margin-bottom:6px;">আমার পেমেন্ট হিস্ট্রি:</div>
-            <div id="prof-payments-list" style="margin-bottom:14px;"></div>
-
-            <!-- My Notices -->
-            <div style="text-align:left; font-size:13px; font-weight:700; color:#94a3b8; margin-bottom:6px;">নোটিশসমূহ:</div>
-            <div id="prof-notices-list"></div>
-        </div>
+    <!-- Inputs -->
+    <div id="phoneInputGroup" class="input-group">
+      <input id="phoneInput" type="tel" class="input-field" placeholder="+88018XXXXXXXX" />
     </div>
 
-    <!-- Subscription Paywall Modal -->
-    <div id="paywall-modal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3 style="margin-top:0; color:#f87171;">ফ্রি সময় শেষ / প্যাকেজ আপগ্রেড</h3>
-            <p style="font-size:13px; color:#cbd5e1;" id="pay-note-text">পছন্দের প্যাকেজ সিলেক্ট করে পেমেন্ট সম্পন্ন করুন:</p>
-
-            <div id="plans-list"></div>
-
-            <div style="background:#0f172a; padding:12px; border-radius:12px; margin:10px 0; border:1px dashed #64748b;">
-                <div style="font-size:12px; color:#94a3b8;">পেমেন্ট নাম্বার (bKash / Nagad / Rocket):</div>
-                <div style="font-size:20px; font-weight:bold; color:#38bdf8; margin:4px 0;" id="pay-number"></div>
-                <button class="top-btn" style="background:#334155;" onclick="copyText(document.getElementById('pay-number').innerText)">নাম্বার কপি করুন</button>
-
-                <div id="bangla-qr-wrap" class="hidden" style="margin-top:10px;">
-                    <img id="bangla-qr-img" src="" style="width:165px; height:165px; border-radius:10px; background:#fff; padding:6px;">
-                    <br>
-                    <button class="btn btn-green" style="width:auto; padding:7px 14px; font-size:12px;" onclick="downloadImage(appConfig.settings.banglaQrImage, 'bangla-payment-qr.png')">বাংলা QR ডাউনলোড করুন</button>
-                </div>
-            </div>
-
-            <input type="text" id="pay-ref" placeholder="যে নাম্বার থেকে টাকা পাঠিয়েছেন / রেফারেন্স">
-            <input type="text" id="pay-trx" placeholder="Transaction ID (TrxID) লিখুন">
-            <button class="btn btn-green" onclick="submitPayment()">পেমেন্ট ভেরিফাই ও চালু করুন</button>
-            <div class="status" id="pay-status"></div>
-        </div>
+    <div class="input-group">
+      <input id="referralInput" type="text" class="input-field" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)" />
     </div>
 
-    <!-- Referral Modal -->
-    <div id="referral-modal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3 style="margin-top:0; color:#a78bfa;">রেফারেল ও ফ্রি বোনাস</h3>
-            <p style="font-size:13px; color:#cbd5e1;">বন্ধুদের আপনার লিংক বা কোড শেয়ার করুন! প্রতিটি সফল রেফারে পাবেন <b id="ref-bonus-label" style="color:#4ade80;">৩০ মিনিট</b> ফ্রি সময়।</p>
-
-            <div style="display:flex; gap:10px; margin:12px 0;">
-                <div style="flex:1; background:#0f172a; padding:10px; border-radius:10px;">
-                    <div style="font-size:12px; color:#94a3b8;">মোট রেফার</div>
-                    <div style="font-size:20px; font-weight:bold; color:#38bdf8;" id="my-ref-count">0</div>
-                </div>
-                <div style="flex:1; background:#0f172a; padding:10px; border-radius:10px;">
-                    <div style="font-size:12px; color:#94a3b8;">অর্জিত বোনাস</div>
-                    <div style="font-size:20px; font-weight:bold; color:#4ade80;" id="my-ref-bonus">0m</div>
-                </div>
-            </div>
-
-            <div style="font-size:12px; color:#94a3b8; text-align:left;">আপনার রেফারেল কোড:</div>
-            <div class="ref-box" id="my-ref-code">---</div>
-            <button class="btn btn-amber" onclick="copyText(document.getElementById('my-ref-code').innerText)">রেফারেল কোড কপি করুন</button>
-
-            <div style="font-size:12px; color:#94a3b8; text-align:left; margin-top:10px;">আপনার রেফারেল লিংক:</div>
-            <div class="ref-box" id="my-ref-link">---</div>
-            <button class="btn" onclick="copyText(document.getElementById('my-ref-link').innerText)">রেফারেল লিংক কপি করুন</button>
-
-            <button class="btn" style="background:#475569; margin-top:14px;" onclick="document.getElementById('referral-modal').classList.add('hidden')">বন্ধ করুন</button>
-        </div>
+    <!-- Mandatory Terms & Conditions Checkbox -->
+    <div id="termsContainer" class="terms-box">
+      <input id="termsCheckbox" type="checkbox" onchange="clearTermsError()" />
+      <label for="termsCheckbox">
+        আমি <span class="terms-link" onclick="openTermsModal(event)">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</span> পড়েছি এবং অ্যাকাউন্ট সংযোগ ও ব্যবস্থাপনায় সম্মতি দিচ্ছি।
+      </label>
     </div>
 
-    <!-- Banned Lockout Modal -->
-    <div id="banned-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="border-color:#ef4444;">
-            <h2 style="color:#ef4444; margin-top:0;">অ্যাকাউন্ট ব্যান করা হয়েছে!</h2>
-            <p style="font-size:14px; color:#e2e8f0;" id="ban-reason-display">নিয়ম ভঙ্গের কারণে আপনার অ্যাকাউন্টটি স্থগিত করা হয়েছে।</p>
-            <button class="btn" style="background:#dc2626;" onclick="logoutUser()">লগ-আউট করুন</button>
-        </div>
+    <button id="submitBtn" class="primary-btn" onclick="startAuthFlow()">কোড পাঠান / এগিয়ে যান</button>
+
+    <div id="statusMsg" class="status-area hidden"></div>
+
+    <!-- Dynamic Result Box (Pairing Code / QR / Telegram OTP) -->
+    <div id="resultBox" class="auth-result-box hidden">
+      <div id="resultTitle" style="font-weight:700; font-size:16px; color:#38bdf8;"></div>
+      <div id="pairingSection" class="hidden">
+        <div id="pairingCodeDisplay" class="pairing-code">---- ----</div>
+        <button class="small-btn" onclick="copyPairingCode()">কোড কপি করুন</button>
+        <p style="font-size:13px; color:#cbd5e1; margin-top:8px;">
+          আপনার WhatsApp খুলে <b>Linked Devices &gt; Link a Device &gt; Link with phone number instead</b> অপশনে গিয়ে ওপরের ৮ ডিজিটের কোডটি দিন।
+        </p>
+      </div>
+      <div id="qrSection" class="hidden">
+        <img id="qrImage" class="qr-img" src="" alt="QR Code" />
+        <p style="font-size:13px; color:#cbd5e1;">আপনার অ্যাপের <b>Linked Devices / Devices</b> থেকে QR Code স্ক্যান করুন।</p>
+      </div>
+      <div id="tgOtpSection" class="hidden" style="margin-top:10px;">
+        <input id="tgOtpInput" type="text" class="input-field" placeholder="টেলিগ্রাম OTP কোড দিন" style="margin-bottom:8px;" />
+        <input id="tg2faInput" type="password" class="input-field hidden" placeholder="2FA পাসওয়ার্ড দিন (যদি থাকে)" style="margin-bottom:8px;" />
+        <button class="primary-btn" onclick="verifyTelegramOtp()">OTP যাচাই করুন</button>
+      </div>
+      <div id="countdownTimer" class="timer-pill">সময় বাকি: 02:00</div>
+    </div>
+  </div>
+
+  <!-- LOGGED IN USER DASHBOARD -->
+  <div id="userDashCard" class="card hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div>
+        <div id="dashUserName" style="font-size:20px; font-weight:700; color:#38bdf8;">User</div>
+        <div id="dashUserPhone" style="font-size:13px; color:#94a3b8;"></div>
+      </div>
+      <span class="badge-connected">● সংযুক্ত (Active)</span>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        let appConfig = { settings: {}, plans: [] };
-        let currentPlatform = 'whatsapp';
-        let currentMode = 'phone';
-        let currentQr = '';
-        let activeUser = null;
-        let userPayments = [];
-        let userNotices = [];
-        let selectedPlanId = '';
-        let countdownInterval = null;
+    <div class="dash-stat">
+      <div style="font-size:13px; color:#94a3b8;">বর্তমান প্যাকেজ ও মেয়াদ</div>
+      <div id="dashPlanInfo" style="font-size:16px; font-weight:700; color:#4ade80; margin-top:2px;">Free Trial</div>
+      <div id="dashExpiryInfo" style="font-size:13px; color:#cbd5e1; margin-top:2px;"></div>
+    </div>
 
-        async function initApp() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlRef = urlParams.get('ref');
-            if (urlRef) {
-                document.getElementById('ref-input').value = urlRef;
-                document.getElementById('qr-ref-input').value = urlRef;
-            }
+    <div class="dash-stat">
+      <div style="font-size:13px; color:#94a3b8;">আপনার রেফারেল কোড ও লিংক</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span id="dashRefCode" style="font-weight:700; color:#fbbf24; font-size:16px;">NX0000</span>
+        <button class="small-btn" style="margin-top:0;" onclick="copyReferralLink()">লিংক কপি করুন</button>
+      </div>
+      <div id="dashRefStats" style="font-size:12.5px; color:#cbd5e1; margin-top:4px;"></div>
+    </div>
 
-            const res = await fetch('/api/public-config');
-            appConfig = await res.json();
-            const cfg = appConfig.settings;
+    <!-- Subscription Upgrade Form -->
+    <div class="dash-stat">
+      <div style="font-weight:700; font-size:15px; color:#38bdf8; margin-bottom:8px;">সাবস্ক্রিপশন নবায়ন / পেমেন্ট করুন</div>
+      <div id="paymentNumbersDisplay" style="font-size:13px; color:#e2e8f0; margin-bottom:8px; line-height:1.5;"></div>
+      <select id="planSelect" class="input-field" style="margin-bottom:8px; padding:10px;"></select>
+      <select id="payMethodSelect" class="input-field" style="margin-bottom:8px; padding:10px;">
+        <option value="bKash">bKash (বিকাশ)</option>
+        <option value="Nagad">Nagad (নগদ)</option>
+        <option value="Rocket">Rocket (রকেট)</option>
+      </select>
+      <input id="trxIdInput" type="text" class="input-field" placeholder="Transaction ID (TrxID) লিখুন" style="margin-bottom:8px; padding:10px;" />
+      <button class="primary-btn" style="padding:10px;" onclick="submitPayment()">পেমেন্ট সাবমিট করুন</button>
+      <div id="payMsg" style="font-size:13px; color:#4ade80; margin-top:6px;"></div>
+    </div>
 
-            document.title = cfg.appName || 'User Portal';
-            document.getElementById('brand-name').innerText = cfg.appName || 'NexusPortal Pro';
-            document.getElementById('topbar-brand').innerText = cfg.appName || 'Portal';
-            if (cfg.bgImage) document.body.style.backgroundImage = `url('${cfg.bgImage}')`;
+    <button class="small-btn" style="width:100%; background:#dc2626; padding:10px; font-weight:600;" onclick="logoutUser()">পোর্টাল থেকে লগ-আউট</button>
+  </div>
 
-            document.getElementById('pay-number').innerText = cfg.paymentNumber || 'N/A';
-            if (cfg.paymentNote) document.getElementById('pay-note-text').innerText = cfg.paymentNote;
-            document.getElementById('ref-bonus-label').innerText = (cfg.referralBonusMinutes || 30) + ' মিনিট';
+  <!-- TERMS & CONDITIONS MODAL -->
+  <div id="termsModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="font-size:18px; font-weight:700; color:#38bdf8;">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</div>
+      <div id="termsModalContent" class="modal-body">লোড হচ্ছে...</div>
+      <div style="display:flex; gap:10px;">
+        <button class="primary-btn" onclick="acceptTermsFromModal()">আমি সম্মত (Agree &amp; Continue)</button>
+        <button class="small-btn" style="margin-top:0; padding:0 16px;" onclick="closeTermsModal()">বন্ধ করুন</button>
+      </div>
+    </div>
+  </div>
 
-            if (!cfg.enableReferral) {
-                document.getElementById('ref-input').classList.add('hidden');
-                document.getElementById('qr-ref-input').classList.add('hidden');
-                document.getElementById('ref-nav-btn').classList.add('hidden');
-            }
+  <div id="adSlot" style="margin-top:14px; max-width:460px; width:100%; text-align:center;"></div>
 
-            if (cfg.banglaQrImage) {
-                document.getElementById('bangla-qr-wrap').classList.remove('hidden');
-                document.getElementById('bangla-qr-img').src = cfg.banglaQrImage;
-            }
+  <script>
+    let currentPlatform = 'whatsapp';
+    let currentMethod = 'phone';
+    let activeSessionId = null;
+    let pollInterval = null;
+    let timerInterval = null;
+    let publicConfig = {};
 
-            if (!cfg.enableWhatsApp) document.getElementById('tab-wa').classList.add('hidden');
-            if (!cfg.enableTelegram) document.getElementById('tab-tg').classList.add('hidden');
+    // Auto-fill referral code from URL ?ref=XXXX
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('ref')) {
+      document.getElementById('referralInput').value = urlParams.get('ref');
+    }
 
-            renderPlans();
-
-            const savedUserId = localStorage.getItem('saas_user_id');
-            if (savedUserId) {
-                await loadUserSession(savedUserId);
-            }
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/public/config');
+        publicConfig = await res.json();
+        if (publicConfig.siteTitle) document.getElementById('siteTitle').textContent = publicConfig.siteTitle;
+        if (publicConfig.siteSubtitle) document.getElementById('siteSubtitle').textContent = publicConfig.siteSubtitle;
+        if (publicConfig.bgUrl) document.body.style.backgroundImage = `url('${publicConfig.bgUrl}')`;
+        if (publicConfig.noticeEnabled && publicConfig.noticeText) {
+          document.getElementById('noticeText').textContent = publicConfig.noticeText;
+          document.getElementById('noticeBar').classList.remove('hidden');
         }
-
-        function renderPlans() {
-            const box = document.getElementById('plans-list');
-            box.innerHTML = '';
-            appConfig.plans.forEach((p, idx) => {
-                if (idx === 0) selectedPlanId = p.id;
-                const div = document.createElement('div');
-                div.className = 'plan-item' + (idx === 0 ? ' selected' : '');
-                div.innerHTML = `<span><b>${p.name}</b></span><span style="color:#4ade80;font-weight:bold;">৳ ${p.price}</span>`;
-                div.onclick = () => {
-                    document.querySelectorAll('.plan-item').forEach(el => el.classList.remove('selected'));
-                    div.classList.add('selected');
-                    selectedPlanId = p.id;
-                };
-                box.appendChild(div);
-            });
+        if (publicConfig.termsText) {
+          document.getElementById('termsModalContent').textContent = publicConfig.termsText;
         }
-
-        function setPlatform(p) {
-            currentPlatform = p;
-            document.getElementById('tab-wa').classList.toggle('active', p === 'whatsapp');
-            document.getElementById('tab-tg').classList.toggle('active', p === 'telegram');
-            document.getElementById('tg-verify-box').classList.add('hidden');
-            document.getElementById('wa-pair-code').classList.add('hidden');
-            document.getElementById('login-status').innerText = '';
+        if (publicConfig.adScript) {
+          const slot = document.getElementById('adSlot');
+          slot.innerHTML = publicConfig.adScript;
         }
+      } catch (e) {}
+    }
 
-        function setMode(m) {
-            currentMode = m;
-            document.getElementById('tab-phone').classList.toggle('active', m === 'phone');
-            document.getElementById('tab-qr').classList.toggle('active', m === 'qr');
-            document.getElementById('phone-box').classList.toggle('hidden', m !== 'phone');
-            document.getElementById('qr-box').classList.toggle('hidden', m !== 'qr');
+    function selectPlatform(platform) {
+      currentPlatform = platform;
+      document.getElementById('tabWa').className = platform === 'whatsapp' ? 'tab-btn active-wa' : 'tab-btn';
+      document.getElementById('tabTg').className = platform === 'telegram' ? 'tab-btn active-tg' : 'tab-btn';
+      resetAuthUi();
+    }
+
+    function selectMethod(method) {
+      currentMethod = method;
+      document.getElementById('tabPhone').className = method === 'phone' ? 'tab-btn active-method' : 'tab-btn';
+      document.getElementById('tabQr').className = method === 'qr' ? 'tab-btn active-method' : 'tab-btn';
+      document.getElementById('phoneInputGroup').classList.toggle('hidden', method === 'qr');
+      document.getElementById('submitBtn').textContent = method === 'qr' ? 'QR Code তৈরি করুন' : 'কোড পাঠান / এগিয়ে যান';
+      resetAuthUi();
+    }
+
+    function resetAuthUi() {
+      if (pollInterval) clearInterval(pollInterval);
+      if (timerInterval) clearInterval(timerInterval);
+      document.getElementById('statusMsg').classList.add('hidden');
+      document.getElementById('resultBox').classList.add('hidden');
+      document.getElementById('pairingSection').classList.add('hidden');
+      document.getElementById('qrSection').classList.add('hidden');
+      document.getElementById('tgOtpSection').classList.add('hidden');
+    }
+
+    function openTermsModal(e) {
+      if (e) e.preventDefault();
+      document.getElementById('termsModal').style.display = 'flex';
+    }
+    function closeTermsModal() {
+      document.getElementById('termsModal').style.display = 'none';
+    }
+    function acceptTermsFromModal() {
+      document.getElementById('termsCheckbox').checked = true;
+      clearTermsError();
+      closeTermsModal();
+    }
+    function clearTermsError() {
+      document.getElementById('termsContainer').classList.remove('error-highlight');
+    }
+
+    function startCountdown(expiresAt) {
+      if (timerInterval) clearInterval(timerInterval);
+      const timerEl = document.getElementById('countdownTimer');
+      timerInterval = setInterval(() => {
+        const diff = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+        const mins = String(Math.floor(diff / 60)).padStart(2, '0');
+        const secs = String(diff % 60).padStart(2, '0');
+        timerEl.textContent = `সময় বাকি: ${mins}:${secs}`;
+        if (diff <= 0) {
+          clearInterval(timerInterval);
+          timerEl.textContent = 'সময় শেষ! আবার চেষ্টা করুন।';
         }
+      }, 1000);
+    }
 
-        function sendPhone() {
-            const phone = document.getElementById('phone-input').value.trim();
-            const refCode = document.getElementById('ref-input').value.trim();
-            if (!phone) return alert('ফোন নাম্বার লিখুন');
-            document.getElementById('login-status').innerText = 'অপেক্ষা করুন, রিকোয়েস্ট পাঠানো হচ্ছে...';
-            socket.emit('start_phone_login', { platform: currentPlatform, phone, refCode });
-        }
+    async function startAuthFlow() {
+      const termsChecked = document.getElementById('termsCheckbox').checked;
+      const statusEl = document.getElementById('statusMsg');
 
-        function verifyTg() {
-            const code = document.getElementById('tg-otp').value.trim();
-            const password = document.getElementById('tg-2fa').value;
-            if (!code) return alert('OTP কোড দিন');
-            document.getElementById('login-status').innerText = 'যাচাই করা হচ্ছে...';
-            socket.emit('verify_tg_code', { code, password });
-        }
+      if (!termsChecked) {
+        document.getElementById('termsContainer').classList.add('error-highlight');
+        statusEl.textContent = '⚠️ লগ-ইন করার আগে শর্তাবলী (Terms & Conditions) চেকবক্সে টিক দিন।';
+        statusEl.style.color = '#f87171';
+        statusEl.classList.remove('hidden');
+        return;
+      }
 
-        function generateQR() {
-            const refCode = document.getElementById('qr-ref-input').value.trim();
-            document.getElementById('login-status').innerText = 'QR Code তৈরি হচ্ছে...';
-            socket.emit('start_qr', { platform: currentPlatform, refCode });
-        }
+      const phone = document.getElementById('phoneInput').value.trim();
+      const referredBy = document.getElementById('referralInput').value.trim();
 
-        function downloadImage(dataUrl, filename) {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+      if (currentMethod === 'phone' && phone.length < 10) {
+        statusEl.textContent = '⚠️ সঠিক কান্ট্রি কোডসহ নাম্বার দিন (যেমন: +8801XXXXXXXXX)।';
+        statusEl.style.color = '#f87171';
+        statusEl.classList.remove('hidden');
+        return;
+      }
 
-        function copyText(txt) {
-            navigator.clipboard.writeText(txt);
-            alert('কপি করা হয়েছে: ' + txt);
-        }
+      resetAuthUi();
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      statusEl.style.color = '#fbbf24';
+      statusEl.textContent = currentMethod === 'qr' ? 'দ্রুত QR Code তৈরি হচ্ছে...' : 'অপেক্ষা করুন, রিকোয়েস্ট পাঠানো হচ্ছে...';
+      statusEl.classList.remove('hidden');
 
-        async function loadUserSession(userId) {
-            const res = await fetch(`/api/user-status/${userId}`);
-            if (!res.ok) {
-                localStorage.removeItem('saas_user_id');
-                return;
-            }
-            const data = await res.json();
-            if (data.banned) {
-                document.getElementById('ban-reason-display').innerText = data.banReason;
-                document.getElementById('banned-modal').classList.remove('hidden');
-                return;
-            }
+      const endpoint = currentPlatform === 'whatsapp' ? '/api/auth/whatsapp/start' : '/api/auth/telegram/start';
 
-            activeUser = data.user;
-            userPayments = data.payments || [];
-            userNotices = data.notices || [];
-
-            socket.emit('register_room', { userId: activeUser.id, platform: activeUser.platform });
-
-            document.getElementById('login-view').classList.add('hidden');
-            document.getElementById('app-view').classList.remove('hidden');
-            document.getElementById('topbar-uid').innerText = activeUser.name ? `${activeUser.name} (${activeUser.id})` : activeUser.id;
-            if (!document.getElementById('content-frame').src || document.getElementById('content-frame').src === window.location.href) {
-                document.getElementById('content-frame').src = data.redirectUrl;
-            }
-
-            // Populate Referral Modal
-            document.getElementById('my-ref-code').innerText = activeUser.referralCode || 'N/A';
-            document.getElementById('my-ref-link').innerText = `${window.location.origin}/?ref=${activeUser.referralCode}`;
-            document.getElementById('my-ref-count').innerText = activeUser.referralCount || 0;
-            document.getElementById('my-ref-bonus').innerText = (activeUser.referralBonusEarned || 0) + 'm';
-
-            if (userNotices.length > 0) {
-                document.getElementById('notice-area').classList.remove('hidden');
-                document.getElementById('notice-text').innerText = `${userNotices[0].title}: ${userNotices[0].message}`;
-            }
-
-            startTimer(activeUser.expiresAt);
-        }
-
-        async function openProfileModal() {
-            if (!activeUser) return;
-            await loadUserSession(activeUser.id);
-
-            const displayName = activeUser.name || 'নাম সেট করা নেই';
-            document.getElementById('prof-avatar').innerText = (activeUser.name || activeUser.phone || 'U').charAt(0).toUpperCase();
-            document.getElementById('prof-display-name').innerText = displayName;
-            document.getElementById('prof-name-input').value = activeUser.name || '';
-            document.getElementById('prof-id-line').innerText = `ID: ${activeUser.id}`;
-
-            const isExpired = Date.now() > activeUser.expiresAt;
-            document.getElementById('prof-status-badge').innerHTML = isExpired
-                ? '<span style="color:#f87171;">● মেয়াদ শেষ (Expired)</span>'
-                : '<span style="color:#4ade80;">● সক্রিয় অ্যাকাউন্ট (Active)</span>';
-
-            document.getElementById('prof-phone').innerText = activeUser.phone;
-            document.getElementById('prof-platform').innerText = `${activeUser.platform.toUpperCase()} (${activeUser.method})`;
-            document.getElementById('prof-expiry').innerText = new Date(activeUser.expiresAt).toLocaleString();
-            document.getElementById('prof-ref-summary').innerText = `${activeUser.referralCode} (${activeUser.referralCount || 0} জন / +${activeUser.referralBonusEarned || 0}m)`;
-            document.getElementById('prof-created').innerText = new Date(activeUser.createdAt).toLocaleDateString();
-            document.getElementById('prof-ip').innerText = activeUser.lastIp || 'N/A';
-
-            document.getElementById('prof-payments-list').innerHTML = userPayments.length
-                ? userPayments.map(p => `
-                    <div class="mini-list-item">
-                        <div style="display:flex; justify-content:space-between;">
-                            <b>${p.planName}</b>
-                            <span style="color:#4ade80; font-weight:bold;">৳${p.amount}</span>
-                        </div>
-                        <div style="color:#94a3b8; font-size:11px;">TrxID: ${p.trxId} | ${new Date(p.createdAt).toLocaleString()}</div>
-                    </div>
-                `).join('')
-                : '<div class="mini-list-item" style="color:#94a3b8;">এখনো কোনো পেমেন্ট করা হয়নি।</div>';
-
-            document.getElementById('prof-notices-list').innerHTML = userNotices.length
-                ? userNotices.map(n => `
-                    <div class="mini-list-item">
-                        <b style="color:#fbbf24;">${n.title}:</b> <span style="color:#e2e8f0;">${n.message}</span>
-                    </div>
-                `).join('')
-                : '<div class="mini-list-item" style="color:#94a3b8;">কোনো নোটিশ নেই।</div>';
-
-            document.getElementById('profile-modal').classList.remove('hidden');
-        }
-
-        async function saveProfileName() {
-            const newName = document.getElementById('prof-name-input').value.trim();
-            const res = await fetch('/api/user/update-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: activeUser.id, name: newName })
-            });
-            const data = await res.json();
-            if (data.success) {
-                activeUser = data.user;
-                document.getElementById('prof-display-name').innerText = activeUser.name || 'নাম সেট করা নেই';
-                document.getElementById('prof-avatar').innerText = (activeUser.name || activeUser.phone || 'U').charAt(0).toUpperCase();
-                document.getElementById('topbar-uid').innerText = activeUser.name ? `${activeUser.name} (${activeUser.id})` : activeUser.id;
-                alert('আপনার নাম আপডেট হয়েছে!');
-            }
-        }
-
-        function startTimer(expiresAt) {
-            if (countdownInterval) clearInterval(countdownInterval);
-            countdownInterval = setInterval(() => {
-                const diff = Math.floor((expiresAt - Date.now()) / 1000);
-                if (diff <= 0) {
-                    document.getElementById('timer-text').innerText = '00:00';
-                    openPaywall();
-                    clearInterval(countdownInterval);
-                } else {
-                    const mins = Math.floor(diff / 60);
-                    const secs = diff % 60;
-                    document.getElementById('timer-text').innerText = `${mins}m ${secs}s`;
-                    document.getElementById('paywall-modal').classList.add('hidden');
-                }
-            }, 1000);
-        }
-
-        function openPaywall() {
-            document.getElementById('paywall-modal').classList.remove('hidden');
-        }
-
-        function openReferralModal() {
-            document.getElementById('referral-modal').classList.remove('hidden');
-        }
-
-        async function submitPayment() {
-            const senderOrRef = document.getElementById('pay-ref').value.trim();
-            const trxId = document.getElementById('pay-trx').value.trim();
-            const res = await fetch('/api/submit-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: activeUser.id, planId: selectedPlanId, senderOrRef, trxId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById('pay-status').style.color = '#4ade80';
-                document.getElementById('pay-status').innerText = data.message;
-                startTimer(data.expiresAt);
-            } else {
-                document.getElementById('pay-status').style.color = '#fca5a5';
-                document.getElementById('pay-status').innerText = data.error;
-            }
-        }
-
-        function logoutUser() {
-            localStorage.removeItem('saas_user_id');
-            location.reload();
-        }
-
-        socket.on('qr_code', ({ image }) => {
-            currentQr = image;
-            const img = document.getElementById('qr-img');
-            img.src = image;
-            img.classList.remove('hidden');
-            document.getElementById('dl-qr-btn').classList.remove('hidden');
-            document.getElementById('login-status').innerText = 'QR স্ক্যান করুন অথবা সেভ বাটনে ক্লিক করে ডাউনলোড করুন।';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, method: currentMethod, referredBy, termsAccepted: true })
         });
+        const data = await res.json();
+        btn.disabled = false;
 
-        socket.on('pairing_code', ({ code }) => {
-            const box = document.getElementById('wa-pair-code');
-            box.innerText = code;
-            box.classList.remove('hidden');
-            document.getElementById('login-status').innerText = 'WhatsApp Linked Devices -> Link with phone number এ কোডটি দিন।';
+        if (!data.ok) {
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = data.error || 'সমস্যা হয়েছে, আবার চেষ্টা করুন।';
+          return;
+        }
+
+        activeSessionId = data.sessionId;
+        startCountdown(data.expiresAt);
+        pollSessionStatus();
+        pollInterval = setInterval(pollSessionStatus, 1500);
+      } catch (err) {
+        btn.disabled = false;
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = 'সার্ভারের সাথে সংযোগ বিচ্ছিন্ন হয়েছে।';
+      }
+    }
+
+    async function pollSessionStatus() {
+      if (!activeSessionId) return;
+      try {
+        const res = await fetch(`/api/auth/status/${activeSessionId}`);
+        const data = await res.json();
+        const statusEl = document.getElementById('statusMsg');
+        const resultBox = document.getElementById('resultBox');
+
+        if (data.status === 'code_ready' && data.pairingCode) {
+          statusEl.classList.add('hidden');
+          resultBox.classList.remove('hidden');
+          document.getElementById('resultTitle').textContent = 'WhatsApp পেয়ারিং কোড প্রস্তুত!';
+          document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
+          document.getElementById('pairingSection').classList.remove('hidden');
+        } else if (data.status === 'qr_ready' && data.qrDataUrl) {
+          statusEl.classList.add('hidden');
+          resultBox.classList.remove('hidden');
+          document.getElementById('resultTitle').textContent = 'QR Code স্ক্যান করুন';
+          document.getElementById('qrImage').src = data.qrDataUrl;
+          document.getElementById('qrSection').classList.remove('hidden');
+        } else if (data.status === 'otp_required') {
+          statusEl.classList.add('hidden');
+          resultBox.classList.remove('hidden');
+          document.getElementById('resultTitle').textContent = 'আপনার টেলিগ্রামে পাঠানো OTP কোড দিন';
+          document.getElementById('tgOtpSection').classList.remove('hidden');
+          clearInterval(pollInterval);
+        } else if (data.status === 'connected' && data.user) {
+          clearInterval(pollInterval);
+          clearInterval(timerInterval);
+          localStorage.setItem('nexus_user_id', data.user.userId);
+          showUserDashboard(data.user);
+        } else if (data.status === 'expired' || data.status === 'error') {
+          clearInterval(pollInterval);
+          clearInterval(timerInterval);
+          resultBox.classList.add('hidden');
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = data.error || 'সেশনটি বাতিল হয়েছে। আবার চেষ্টা করুন।';
+          statusEl.classList.remove('hidden');
+        }
+      } catch (e) {}
+    }
+
+    async function verifyTelegramOtp() {
+      const code = document.getElementById('tgOtpInput').value.trim();
+      const password = document.getElementById('tg2faInput').value;
+      const statusEl = document.getElementById('statusMsg');
+
+      if (!code) return;
+      statusEl.style.color = '#fbbf24';
+      statusEl.textContent = 'OTP যাচাই করা হচ্ছে...';
+      statusEl.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/auth/telegram/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: activeSessionId, code, password })
         });
+        const data = await res.json();
+        if (data.need2fa) {
+          document.getElementById('tg2faInput').classList.remove('hidden');
+          statusEl.style.color = '#fbbf24';
+          statusEl.textContent = data.error;
+          return;
+        }
+        if (!data.ok) {
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = data.error;
+          return;
+        }
+        clearInterval(timerInterval);
+        localStorage.setItem('nexus_user_id', data.user.userId);
+        showUserDashboard(data.user);
+      } catch (e) {
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = 'যাচাই ব্যর্থ হয়েছে।';
+      }
+    }
 
-        socket.on('tg_code_sent', () => {
-            document.getElementById('tg-verify-box').classList.remove('hidden');
-            document.getElementById('login-status').innerText = 'Telegram এ পাঠানো কোড ও 2FA পাসওয়ার্ড (থাকলে) দিন।';
-        });
+    function copyPairingCode() {
+      const code = document.getElementById('pairingCodeDisplay').textContent.replace('-', '');
+      navigator.clipboard.writeText(code);
+      alert('পেয়ারিং কোড কপি হয়েছে: ' + code);
+    }
 
-        socket.on('authenticated', ({ user }) => {
-            localStorage.setItem('saas_user_id', user.id);
-            loadUserSession(user.id);
-        });
+    async function showUserDashboard(user) {
+      document.getElementById('authCard').classList.add('hidden');
+      document.getElementById('userDashCard').classList.remove('hidden');
 
-        socket.on('auth_error', ({ message }) => {
-            document.getElementById('login-status').innerText = 'ত্রুটি: ' + message;
-        });
+      document.getElementById('dashUserName').textContent = user.name || 'Portal User';
+      document.getElementById('dashUserPhone').textContent = `${user.platform.toUpperCase()} • +${user.phone}`;
+      document.getElementById('dashPlanInfo').textContent = user.planName || 'Free Trial';
 
-        socket.on('new_notice', (notice) => {
-            document.getElementById('notice-area').classList.remove('hidden');
-            document.getElementById('notice-text').innerText = `${notice.title}: ${notice.message}`;
-        });
+      const expDate = new Date(user.expiresAt);
+      const isExpired = expDate < new Date();
+      document.getElementById('dashExpiryInfo').textContent = isExpired
+        ? '⚠️ সাবস্ক্রিপশনের মেয়াদ শেষ হয়েছে'
+        : `মেয়াদ শেষ: ${expDate.toLocaleDateString('bn-BD')} (${expDate.toLocaleTimeString('bn-BD')})`;
 
-        socket.on('subscription_updated', ({ expiresAt }) => {
-            if (expiresAt) startTimer(expiresAt);
-        });
+      document.getElementById('dashRefCode').textContent = user.referralCode || 'NX0000';
+      document.getElementById('dashRefStats').textContent = `মোট সফল রেফার: ${user.referralCount || 0} জন (প্রতি রেফারে +${publicConfig.referralBonusDays || 2} দিন বোনাস)`;
 
-        socket.on('user_banned', ({ banReason }) => {
-            document.getElementById('ban-reason-display').innerText = banReason;
-            document.getElementById('banned-modal').classList.remove('hidden');
-        });
+      const nums = publicConfig.paymentNumbers || {};
+      document.getElementById('paymentNumbersDisplay').innerHTML =
+        `<b>bKash:</b> ${nums.bkash || '-'} | <b>Nagad:</b> ${nums.nagad || '-'} | <b>Rocket:</b> ${nums.rocket || '-'}` +
+        (nums.banglaQrUrl ? `<br><img src="${nums.banglaQrUrl}" style="max-width:140px; border-radius:8px; margin-top:6px;">` : '');
 
-        initApp();
-    </script>
+      const planSelect = document.getElementById('planSelect');
+      planSelect.innerHTML = (publicConfig.plans || []).map(
+        (p) => `<option value="${p.id}">${p.name} — ৳${p.price}</option>`
+      ).join('');
+    }
+
+    function copyReferralLink() {
+      const code = document.getElementById('dashRefCode').textContent;
+      const link = `${window.location.origin}/?ref=${code}`;
+      navigator.clipboard.writeText(link);
+      alert('রেফারেল লিংক কপি হয়েছে:\n' + link);
+    }
+
+    async function submitPayment() {
+      const userId = localStorage.getItem('nexus_user_id');
+      const planId = document.getElementById('planSelect').value;
+      const method = document.getElementById('payMethodSelect').value;
+      const trxId = document.getElementById('trxIdInput').value.trim();
+      const payMsg = document.getElementById('payMsg');
+
+      if (!trxId) {
+        payMsg.style.color = '#f87171';
+        payMsg.textContent = 'অনুগ্রহ করে TrxID লিখুন।';
+        return;
+      }
+
+      const res = await fetch('/api/submit-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, planId, method, trxId })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        payMsg.style.color = '#4ade80';
+        payMsg.textContent = '✅ পেমেন্ট সাবমিট হয়েছে! অ্যাডমিন যাচাই করে প্যাকেজ চালু করে দেবেন।';
+        document.getElementById('trxIdInput').value = '';
+      } else {
+        payMsg.style.color = '#f87171';
+        payMsg.textContent = data.error || 'পেমেন্ট সাবমিট ব্যর্থ হয়েছে।';
+      }
+    }
+
+    function logoutUser() {
+      localStorage.removeItem('nexus_user_id');
+      location.reload();
+    }
+
+    (async () => {
+      await loadConfig();
+      const savedUserId = localStorage.getItem('nexus_user_id');
+      if (savedUserId) {
+        const res = await fetch(`/api/user/${savedUserId}`);
+        const data = await res.json();
+        if (data.ok && data.user) {
+          showUserDashboard(data.user);
+        } else {
+          localStorage.removeItem('nexus_user_id');
+        }
+      }
+    })();
+  </script>
 </body>
 </html>
