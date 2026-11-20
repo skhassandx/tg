@@ -1,7 +1,7 @@
 {
-  "name": "dynamic-wa-tg-saas",
-  "version": "2.0.0",
-  "description": "Dynamic WhatsApp & Telegram Login with Admin Panel & Subscription System",
+  "name": "pro-saas-wa-tg-system",
+  "version": "3.0.0",
+  "description": "Enterprise WhatsApp & Telegram SaaS Login, Subscription, Referral & Admin Dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
