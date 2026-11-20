@@ -40,10 +40,18 @@
         .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         .topbar {
             background: #111827; border-bottom: 1px solid #1f2937; padding: 12px 18px;
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
         }
         .hamburger { display: none; background: #1e293b; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; font-size: 16px; cursor: pointer; }
         .content-area { padding: 18px; flex: 1; overflow-y: auto; }
+
+        /* DB Pill */
+        .db-pill {
+            padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .db-ok { background: rgba(22, 163, 74, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.35); }
+        .db-warn { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); }
 
         /* Cards & Grids */
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 14px; margin-bottom: 20px; }
@@ -71,6 +79,12 @@
         .btn-red { background: #dc2626; }
         .btn-amber { background: #d97706; }
         .btn-slate { background: #475569; }
+        .preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .preset-btn {
+            background: #0f172a; border: 1px solid #475569; color: #38bdf8;
+            padding: 5px 10px; border-radius: 7px; font-size: 12px; cursor: pointer; font-weight: 600;
+        }
+        .preset-btn:hover { border-color: #38bdf8; background: #1e3a8a; color: #fff; }
 
         .table-wrap { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -126,6 +140,7 @@
                 <div class="menu-item" onclick="toggleSubmenu('sub-users')">👥 ইউজার ও অ্যাকাউন্ট ▾</div>
                 <div class="submenu" id="sub-users">
                     <div class="submenu-item" id="nav-users-all" onclick="switchView('users-all')">• সকল ইউজার লিস্ট</div>
+                    <div class="submenu-item" onclick="openAddUserModal()">• + নতুন ইউজার যোগ করুন</div>
                     <div class="submenu-item" id="nav-users-banned" onclick="switchView('users-banned')">• ব্যানকৃত ইউজার (Banned)</div>
                     <div class="submenu-item" id="nav-login-history" onclick="switchView('login-history')">• লগ-ইন হিস্ট্রি</div>
                 </div>
@@ -157,7 +172,11 @@
                     <button class="hamburger" onclick="toggleSidebar()">☰</button>
                     <strong id="page-heading">ড্যাশবোর্ড ওভারভিউ</strong>
                 </div>
-                <button class="btn btn-red" onclick="location.reload()">লগ-আউট</button>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span id="db-status-pill" class="db-pill db-warn">ডাটাবেস যাচাই হচ্ছে...</span>
+                    <button class="btn btn-green" onclick="openAddUserModal()">+ ইউজার এড</button>
+                    <button class="btn btn-red" onclick="location.reload()">লগ-আউট</button>
+                </div>
             </header>
 
             <main class="content-area">
@@ -195,9 +214,12 @@
                 <!-- VIEW: ALL USERS -->
                 <section id="view-users-all" class="hidden">
                     <div class="panel-card">
-                        <h3 class="panel-title">সকল ইউজার ম্যানেজমেন্ট</h3>
+                        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:14px;">
+                            <h3 style="margin:0; font-size:16px;">সকল ইউজার ম্যানেজমেন্ট</h3>
+                            <button class="btn btn-green" onclick="openAddUserModal()">+ ম্যানুয়ালি ইউজার এড করুন</button>
+                        </div>
                         <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-                            <input type="text" id="user-search-input" style="flex:2; margin:0;" placeholder="ID বা ফোন নাম্বার দিয়ে খুঁজুন..." onkeyup="renderUsersTable()">
+                            <input type="text" id="user-search-input" style="flex:2; margin:0;" placeholder="ID, নাম বা ফোন নাম্বার দিয়ে খুঁজুন..." onkeyup="renderUsersTable()">
                             <select id="user-platform-filter" style="flex:1; margin:0;" onchange="renderUsersTable()">
                                 <option value="all">সব প্ল্যাটফর্ম</option>
                                 <option value="whatsapp">WhatsApp</option>
@@ -209,6 +231,7 @@
                                 <thead>
                                     <tr>
                                         <th>User ID</th>
+                                        <th>নাম</th>
                                         <th>ফোন / অ্যাকাউন্ট</th>
                                         <th>প্ল্যাটফর্ম</th>
                                         <th>মেথড</th>
@@ -405,6 +428,42 @@
         </div>
     </div>
 
+    <!-- Manual Add User Modal -->
+    <div class="modal-overlay hidden" id="add-user-modal">
+        <div class="modal-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:12px;">
+                <h3 style="margin:0; color:#4ade80;">+ ম্যানুয়ালি নতুন ইউজার যোগ করুন</h3>
+                <button class="btn btn-slate" onclick="closeAddUserModal()">✕</button>
+            </div>
+
+            <label>ইউজারের নাম (ঐচ্ছিক):</label>
+            <input type="text" id="add-user-name" placeholder="যেমন: হাসান আল মামুন">
+
+            <label>ফোন নাম্বার বা ইউজারনেম (আবশ্যক):</label>
+            <input type="text" id="add-user-phone" placeholder="যেমন: 8801818896166">
+
+            <label>প্ল্যাটফর্ম সিলেক্ট করুন:</label>
+            <select id="add-user-platform">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="telegram">Telegram</option>
+            </select>
+
+            <label>সাবস্ক্রিপশন সময় (মিনিটে):</label>
+            <input type="number" id="add-user-mins" value="1440">
+            <div class="preset-row">
+                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=15">১৫ মিনিট</button>
+                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=1440">১ দিন (1440m)</button>
+                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=10080">৭ দিন (10080m)</button>
+                <button type="button" class="preset-btn" onclick="document.getElementById('add-user-mins').value=43200">৩০ দিন (43200m)</button>
+            </div>
+
+            <label>অ্যাডমিন নোট (ঐচ্ছিক):</label>
+            <input type="text" id="add-user-note" placeholder="যেমন: ক্যাশ পেমেন্টে এড করা হলো">
+
+            <button class="btn btn-green" style="width:100%;" onclick="submitManualUser()">ইউজার তৈরি করুন</button>
+        </div>
+    </div>
+
     <!-- User Details & Control Modal -->
     <div class="modal-overlay hidden" id="user-detail-modal">
         <div class="modal-box">
@@ -490,6 +549,45 @@
             }
         }
 
+        function openAddUserModal() {
+            document.getElementById('add-user-modal').classList.remove('hidden');
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        }
+
+        function closeAddUserModal() {
+            document.getElementById('add-user-modal').classList.add('hidden');
+        }
+
+        async function submitManualUser() {
+            const name = document.getElementById('add-user-name').value.trim();
+            const phone = document.getElementById('add-user-phone').value.trim();
+            const platform = document.getElementById('add-user-platform').value;
+            const durationMinutes = Number(document.getElementById('add-user-mins').value);
+            const note = document.getElementById('add-user-note').value.trim();
+
+            if (!phone) return alert('ফোন নাম্বার বা ইউজারনেম দিন!');
+
+            const res = await fetch('/api/admin/users/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+                body: JSON.stringify({ name, phone, platform, durationMinutes, note })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                return alert('ত্রুটি: ' + (data.error || 'ইউজার তৈরি করা যায়নি'));
+            }
+
+            alert(`সফলভাবে ইউজার তৈরি হয়েছে! User ID: ${data.user.id}`);
+            document.getElementById('add-user-name').value = '';
+            document.getElementById('add-user-phone').value = '';
+            document.getElementById('add-user-note').value = '';
+            closeAddUserModal();
+            await refreshData();
+            switchView('users-all');
+        }
+
         function handleFileBase64(input, type) {
             const file = input.files[0];
             if (!file) return;
@@ -508,14 +606,24 @@
         function renderAllViews() {
             const s = appData.stats;
             const cfg = appData.settings;
+            const db = appData.dbStatus || {};
             document.getElementById('admin-brand-title').innerText = cfg.appName || 'Nexus Admin';
+
+            const dbPill = document.getElementById('db-status-pill');
+            if (db.connected) {
+                dbPill.className = 'db-pill db-ok';
+                dbPill.innerText = `🟢 MongoDB Atlas (${db.dbName})`;
+            } else {
+                dbPill.className = 'db-pill db-warn';
+                dbPill.innerText = `🟡 Local JSON Mode`;
+            }
 
             // 1. Clickable Dashboard KPI Cards
             document.getElementById('kpi-container').innerHTML = `
                 <div class="kpi-card" onclick="switchView('users-all', 'all')">
                     <div class="kpi-label">মোট ইউজার (Total)</div>
                     <div class="kpi-val">${s.totalUsers}</div>
-                    <div class="kpi-sub">QR: ${s.qrUsers} | নাম্বার: ${s.phoneUsers} →</div>
+                    <div class="kpi-sub">QR: ${s.qrUsers} | নাম্বার/ম্যানুয়াল: ${s.phoneUsers} →</div>
                 </div>
                 <div class="kpi-card" onclick="switchView('users-all', 'whatsapp')">
                     <div class="kpi-label">WhatsApp ইউজার</div>
@@ -662,7 +770,7 @@
             const q = document.getElementById('user-search-input').value.toLowerCase();
             const plat = document.getElementById('user-platform-filter').value;
             const filtered = appData.users.filter(u => {
-                const matchText = u.id.toLowerCase().includes(q) || u.phone.toLowerCase().includes(q);
+                const matchText = u.id.toLowerCase().includes(q) || u.phone.toLowerCase().includes(q) || (u.name || '').toLowerCase().includes(q);
                 const matchPlat = plat === 'all' || u.platform === plat;
                 return matchText && matchPlat;
             });
@@ -670,20 +778,21 @@
             document.getElementById('all-users-tbody').innerHTML = filtered.map(u => `
                 <tr>
                     <td><b>${u.id}</b></td>
+                    <td>${u.name || '<span style="color:#64748b;">-</span>'}</td>
                     <td>${u.phone}</td>
                     <td><span class="badge ${u.platform === 'whatsapp' ? 'badge-wa' : 'badge-tg'}">${u.platform}</span></td>
                     <td>${u.method}</td>
                     <td>${new Date(u.expiresAt).toLocaleString()}</td>
                     <td><span class="badge ${u.status === 'active' ? 'badge-active' : 'badge-banned'}">${u.status}</span></td>
                     <td>
-                        <button class="btn" onclick="openUserModal('${u.id}')">বিস্তারিত / এডিট</button>
+                        <button class="btn" onclick="openUserModal('${u.id}')">প্রোফাইল / এডিট</button>
                         ${u.status === 'active'
                             ? `<button class="btn btn-amber" onclick="banUserPrompt('${u.id}')">Ban</button>`
                             : `<button class="btn btn-green" onclick="unbanUser('${u.id}')">Unban</button>`}
                         <button class="btn btn-red" onclick="removeUser('${u.id}')">Delete</button>
                     </td>
                 </tr>
-            `).join('') || '<tr><td colspan="7">কোনো ইউজার পাওয়া যায়নি।</td></tr>';
+            `).join('') || '<tr><td colspan="8">কোনো ইউজার পাওয়া যায়নি।</td></tr>';
         }
 
         function openUserModal(userId) {
@@ -691,17 +800,29 @@
             if (!u) return;
             document.getElementById('user-modal-body').innerHTML = `
                 <div><b>User ID:</b> ${u.id}</div>
-                <div><b>ফোন / অ্যাকাউন্ট:</b> ${u.phone}</div>
                 <div><b>প্ল্যাটফর্ম ও মেথড:</b> ${u.platform.toUpperCase()} (${u.method})</div>
                 <div><b>স্ট্যাটাস:</b> ${u.status.toUpperCase()} ${u.banReason ? '(' + u.banReason + ')' : ''}</div>
                 <div><b>রেফারেল কোড:</b> ${u.referralCode || '-'} | <b>রেফার করেছেন:</b> ${u.referralCount || 0} জন</div>
                 <div><b>তৈরির তারিখ:</b> ${new Date(u.createdAt).toLocaleString()}</div>
                 <div><b>সর্বশেষ লগ-ইন:</b> ${new Date(u.lastLogin).toLocaleString()}</div>
                 <div><b>সর্বশেষ IP:</b> ${u.lastIp || 'N/A'}</div>
-                <div><b>ডিভাইস:</b> ${u.lastDevice || 'N/A'}</div>
-                <div><b>মেয়াদ শেষ:</b> ${new Date(u.expiresAt).toLocaleString()}</div>
+                <div><b>মেয়াদ শেষ:</b> <span style="color:#fbbf24;">${new Date(u.expiresAt).toLocaleString()}</span></div>
+                <hr style="border-color:#334155;">
+
+                <label>ইউজারের নাম আপডেট করুন:</label>
+                <input type="text" id="modal-edit-name" value="${u.name || ''}" placeholder="নাম লিখুন...">
+                <label>অ্যাডমিন নোট:</label>
+                <input type="text" id="modal-edit-note" value="${u.note || ''}" placeholder="নোট লিখুন...">
+                <button class="btn" style="margin-bottom:12px;" onclick="saveUserInfo('${u.id}')">তথ্য সেভ করুন</button>
+
                 <hr style="border-color:#334155;">
                 <label>সময় যোগ করুন (মিনিটে):</label>
+                <div class="preset-row">
+                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=60">+১ ঘণ্টা</button>
+                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=1440">+১ দিন</button>
+                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=10080">+৭ দিন</button>
+                    <button type="button" class="preset-btn" onclick="document.getElementById('modal-add-mins').value=43200">+৩০ দিন</button>
+                </div>
                 <div style="display:flex; gap:8px;">
                     <input type="number" id="modal-add-mins" value="60" style="margin:0;">
                     <button class="btn btn-green" onclick="addUserMinutes('${u.id}')">+ সময় যোগ করুন</button>
@@ -718,6 +839,19 @@
 
         function closeUserModal() {
             document.getElementById('user-detail-modal').classList.add('hidden');
+        }
+
+        async function saveUserInfo(userId) {
+            const name = document.getElementById('modal-edit-name').value;
+            const note = document.getElementById('modal-edit-note').value;
+            await fetch('/api/admin/user-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+                body: JSON.stringify({ userId, name, note })
+            });
+            alert('ইউজারের তথ্য আপডেট হয়েছে!');
+            await refreshData();
+            openUserModal(userId);
         }
 
         async function addUserMinutes(userId) {
