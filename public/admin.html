@@ -77,6 +77,7 @@
       border-bottom: 1px solid rgba(148, 163, 184, 0.14);
       padding: 12px 18px;
       display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
       position: sticky; top: 0; z-index: 500;
     }
     .menu-toggle {
@@ -85,6 +86,18 @@
       color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 18px; cursor: pointer;
     }
     .content-wrap { padding: 20px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+    /* Read-Only Notice Banner */
+    .readonly-banner {
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fbbf24;
+      padding: 11px 15px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
 
     /* Cards & Grids */
     .sec-title { font-size: 20px; font-weight: 700; color: #38bdf8; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
@@ -152,6 +165,11 @@
       font-size: 14px; font-weight: 600; cursor: pointer;
       display: inline-flex; align-items: center; gap: 6px;
     }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
     .btn-primary { background: #2563eb; color: #fff; }
     .btn-success { background: #16a34a; color: #fff; }
     .btn-warning { background: #d97706; color: #fff; }
@@ -207,6 +225,7 @@
     <div class="login-card">
       <div style="font-size:24px; font-weight:700; color:#38bdf8; margin-bottom:4px;">NexusPortal Pro</div>
       <div style="font-size:13.5px; color:#94a3b8; margin-bottom:18px;">অ্যাডমিন কন্ট্রোল প্যানেল লগ-ইন</div>
+      <input id="adminUserInput" type="text" class="input-ctrl" placeholder="অ্যাডমিন ইউজারনেম দিন (যেমন: admin)" style="margin-bottom:10px;" onkeyup="if(event.key==='Enter') document.getElementById('adminPassInput').focus()" />
       <input id="adminPassInput" type="password" class="input-ctrl" placeholder="অ্যাডমিন পাসওয়ার্ড দিন" style="margin-bottom:12px;" onkeyup="if(event.key==='Enter') adminLogin()" />
       <button class="btn btn-primary" style="width:100%; justify-content:center; padding:11px;" onclick="adminLogin()">লগ-ইন করুন</button>
       <div id="adminLoginErr" style="color:#f87171; font-size:13px; margin-top:10px;"></div>
@@ -231,7 +250,7 @@
         </button>
         <div id="grp_users" class="nav-sublist">
           <button class="nav-subitem" id="nav_sec_users" data-sec="sec_users" onclick="openFilteredUsers('all', 'সকল ইউজার লিস্ট', this)">• সকল ইউজার লিস্ট</button>
-          <button class="nav-subitem" data-sec="sec_add_user" onclick="showSection('sec_add_user', this)">• + নতুন ইউজার যোগ করুন</button>
+          <button class="nav-subitem mutating-nav" data-sec="sec_add_user" onclick="showSection('sec_add_user', this)">• + নতুন ইউজার যোগ করুন</button>
           <button class="nav-subitem" data-sec="sec_banned" onclick="showSection('sec_banned', this)">• ব্যানকৃত ইউজার (Banned)</button>
           <button class="nav-subitem" data-sec="sec_history" onclick="showSection('sec_history', this)">• লগ-ইন হিস্ট্রি</button>
         </div>
@@ -260,7 +279,8 @@
           <button class="nav-subitem" data-sec="sec_features" onclick="showSection('sec_features', this)">• ফিচার অন/অফ কন্ট্রোল</button>
           <button class="nav-subitem" data-sec="sec_general" onclick="showSection('sec_general', this)">• জেনারেল ও ব্যাকগ্রাউন্ড</button>
           <button class="nav-subitem" data-sec="sec_terms" onclick="showSection('sec_terms', this)">• শর্তাবলী (Terms)</button>
-          <button class="nav-subitem" data-sec="sec_password" onclick="showSection('sec_password', this)">• অ্যাডমিন পাসওয়ার্ড</button>
+          <button class="nav-subitem super-admin-only" id="nav_sec_sub_admins" data-sec="sec_sub_admins" onclick="showSection('sec_sub_admins', this)">• 🛡️ অ্যাডমিন ম্যানেজমেন্ট</button>
+          <button class="nav-subitem super-admin-only" data-sec="sec_password" onclick="showSection('sec_password', this)">• অ্যাডমিন পাসওয়ার্ড</button>
         </div>
       </nav>
     </aside>
@@ -268,9 +288,10 @@
     <!-- Main Area -->
     <div class="main-area">
       <header class="topbar">
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <button class="menu-toggle" onclick="toggleSidebar(true)">☰</button>
           <span id="dbStatusBadge" class="badge badge-green">DB: Checking...</span>
+          <span id="adminRoleBadge" class="badge badge-blue">Role: Checking...</span>
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-slate btn-sm" onclick="loadDashboard()">🔄 রিফ্রেশ</button>
@@ -280,12 +301,16 @@
       </header>
 
       <div class="content-wrap">
+        <!-- Read-Only Alert Banner (Visible only for viewer sub-admins) -->
+        <div id="readOnlyBanner" class="readonly-banner hidden">
+          <span>👁️ <b>Read-Only মোড চালু আছে:</b> আপনি সার্ভারের সকল ডেটা দেখতে পারবেন, তবে কোনো কিছু এডিট, সেভ বা ডিলিট করার অনুমতি নেই।</span>
+        </div>
 
         <!-- 1. DASHBOARD OVERVIEW (CLICKABLE STAT CARDS LIKE v2) -->
         <section id="sec_dashboard" class="admin-sec">
           <div class="sec-title">
             <span>📊 লাইভ ড্যাশবোর্ড ও কুইক কন্ট্রোল</span>
-            <button class="btn btn-success btn-sm" onclick="saveAllSettings()">💾 সব সেটিংস সেভ করুন</button>
+            <button class="btn btn-success btn-sm mutating-btn" onclick="saveAllSettings()">💾 সব সেটিংস সেভ করুন</button>
           </div>
 
           <div class="stats-grid" id="statsCardsGrid"></div>
@@ -329,7 +354,7 @@
                 <option value="phone_only">শুধুমাত্র নাম্বার দিয়ে</option>
                 <option value="qr_only">শুধুমাত্র QR Code দিয়ে</option>
               </select>
-              <button class="btn btn-primary" onclick="saveAllSettings()">সেভ করুন</button>
+              <button class="btn btn-primary mutating-btn" onclick="saveAllSettings()">সেভ করুন</button>
             </div>
           </div>
         </section>
@@ -390,7 +415,7 @@
                 <button type="button" class="btn btn-slate btn-sm" onclick="document.getElementById('addUserMinutes').value=43200">৪৩২০০ মিনিট (৩০ দিন)</button>
               </div>
             </div>
-            <button class="btn btn-success" onclick="manualAddUser()">ইউজার যুক্ত করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="manualAddUser()">ইউজার যুক্ত করুন</button>
           </div>
         </section>
 
@@ -498,14 +523,14 @@
               <div class="upload-row">
                 <input id="set_banglaQrUrl" type="text" class="input-ctrl" style="flex:1; min-width:200px;" placeholder="ইমেজ লিংক দিন অথবা পাশের বাটন থেকে আপলোড করুন" oninput="updateImgPreview('set_banglaQrUrl', 'qrPreviewImg')" />
                 <input id="qrFilePicker" type="file" accept="image/*" class="hidden" onchange="handleImageUpload(this, 'set_banglaQrUrl', 'qrPreviewImg', 450)" />
-                <button type="button" class="btn btn-primary" onclick="document.getElementById('qrFilePicker').click()">📤 ইমেজ আপলোড</button>
-                <button type="button" class="btn btn-danger btn-sm" onclick="clearImageField('set_banglaQrUrl', 'qrPreviewImg')">মুছুন</button>
+                <button type="button" class="btn btn-primary mutating-btn" onclick="document.getElementById('qrFilePicker').click()">📤 ইমেজ আপলোড</button>
+                <button type="button" class="btn btn-danger btn-sm mutating-btn" onclick="clearImageField('set_banglaQrUrl', 'qrPreviewImg')">মুছুন</button>
               </div>
               <img id="qrPreviewImg" class="upload-preview hidden" src="" alt="Bangla QR Preview" />
             </div>
 
             <div style="margin-top:14px;">
-              <button class="btn btn-success" onclick="saveAllSettings()">💾 পেমেন্ট সেটিংস সেভ করুন</button>
+              <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 পেমেন্ট সেটিংস সেভ করুন</button>
             </div>
           </div>
         </section>
@@ -532,7 +557,7 @@
                 <button type="button" class="btn btn-slate btn-sm" onclick="document.getElementById('set_freeTrialMinutes').value=4320">৪৩২০ মিনিট (৩ দিন)</button>
               </div>
             </div>
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 ফ্রি ট্রায়াল সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 ফ্রি ট্রায়াল সেভ করুন</button>
           </div>
 
           <div class="panel-box">
@@ -541,7 +566,7 @@
               <input id="newPlanName" type="text" class="input-ctrl" placeholder="প্যাকেজের নাম (যেমন: VIP 24 Hours)" />
               <input id="newPlanMinutes" type="number" class="input-ctrl" placeholder="সময় (মিনিট, যেমন: 1440)" />
               <input id="newPlanPrice" type="number" class="input-ctrl" placeholder="মূল্য (৳ টাকা, যেমন: 100)" />
-              <button class="btn btn-primary" onclick="addNewPlan()">+ প্যাকেজ যোগ করুন</button>
+              <button class="btn btn-primary mutating-btn" onclick="addNewPlan()">+ প্যাকেজ যোগ করুন</button>
             </div>
             <div class="table-wrap">
               <table>
@@ -577,7 +602,7 @@
               </div>
             </div>
 
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 রেফারেল সেটিংস সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 রেফারেল সেটিংস সেভ করুন</button>
           </div>
         </section>
 
@@ -596,7 +621,7 @@
               <label class="field-label">নোটিশ টেক্সট</label>
               <textarea id="set_noticeText" rows="3" class="textarea-ctrl"></textarea>
             </div>
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 নোটিশ সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 নোটিশ সেভ করুন</button>
           </div>
         </section>
 
@@ -619,7 +644,7 @@
               <label class="field-label">Bottom / Popunder Ad Code (কার্ডের নিচে)</label>
               <textarea id="set_adScript" rows="4" class="textarea-ctrl" placeholder="এখানে HTML / Script কোড পেস্ট করুন"></textarea>
             </div>
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 অ্যাডস কোড সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 অ্যাডস কোড সেভ করুন</button>
           </div>
         </section>
 
@@ -627,7 +652,7 @@
         <section id="sec_features" class="admin-sec hidden">
           <div class="sec-title">
             <span>🎛️ প্রজেক্টের সকল ফিচার অন/অফ কন্ট্রোল</span>
-            <button class="btn btn-success btn-sm" onclick="saveAllSettings()">💾 সেভ করুন</button>
+            <button class="btn btn-success btn-sm mutating-btn" onclick="saveAllSettings()">💾 সেভ করুন</button>
           </div>
           <div class="panel-box">
             <div class="form-grid" style="margin-bottom:12px;">
@@ -696,7 +721,7 @@
               </div>
             </div>
 
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 সকল ফিচার সেটিংস সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 সকল ফিচার সেটিংস সেভ করুন</button>
           </div>
         </section>
 
@@ -744,13 +769,13 @@
               <div class="upload-row">
                 <input id="set_bgUrl" type="text" class="input-ctrl" style="flex:1; min-width:200px;" placeholder="ব্যাকগ্রাউন্ড ইমেজ লিংক দিন অথবা আপলোড করুন" oninput="updateImgPreview('set_bgUrl', 'bgPreviewImg')" />
                 <input id="bgFilePicker" type="file" accept="image/*" class="hidden" onchange="handleImageUpload(this, 'set_bgUrl', 'bgPreviewImg', 1280)" />
-                <button type="button" class="btn btn-primary" onclick="document.getElementById('bgFilePicker').click()">📤 ব্যাকগ্রাউন্ড আপলোড</button>
-                <button type="button" class="btn btn-danger btn-sm" onclick="clearImageField('set_bgUrl', 'bgPreviewImg')">ডিফল্ট রিসেট</button>
+                <button type="button" class="btn btn-primary mutating-btn" onclick="document.getElementById('bgFilePicker').click()">📤 ব্যাকগ্রাউন্ড আপলোড</button>
+                <button type="button" class="btn btn-danger btn-sm mutating-btn" onclick="clearImageField('set_bgUrl', 'bgPreviewImg')">ডিফল্ট রিসেট</button>
               </div>
               <img id="bgPreviewImg" class="upload-preview hidden" src="" alt="Background Preview" />
             </div>
 
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 জেনারেল সেটিংস সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 জেনারেল সেটিংস সেভ করুন</button>
           </div>
         </section>
 
@@ -766,19 +791,63 @@
               <label class="field-label">বিস্তারিত শর্তাবলী (Terms Text)</label>
               <textarea id="set_termsText" rows="8" class="textarea-ctrl"></textarea>
             </div>
-            <button class="btn btn-success" onclick="saveAllSettings()">💾 শর্তাবলী সেভ করুন</button>
+            <button class="btn btn-success mutating-btn" onclick="saveAllSettings()">💾 শর্তাবলী সেভ করুন</button>
           </div>
         </section>
 
-        <!-- 16. ADMIN PASSWORD -->
-        <section id="sec_password" class="admin-sec hidden">
-          <div class="sec-title"><span>🔐 অ্যাডমিন পাসওয়ার্ড পরিবর্তন</span></div>
-          <div class="panel-box" style="max-width:420px;">
+        <!-- 16. SUB-ADMIN USER MANAGEMENT (MAIN ADMIN ONLY - READ-ONLY SUB-ADMINS) -->
+        <section id="sec_sub_admins" class="admin-sec hidden super-admin-only">
+          <div class="sec-title"><span>🛡️ অ্যাডমিন ইউজার ম্যানেজমেন্ট (Read-Only সাব-অ্যাডমিন)</span></div>
+          <div class="panel-box">
+            <p style="color:#94a3b8; font-size:13.5px; margin-bottom:14px;">
+              এখান থেকে নতুন সাব-অ্যাডমিন তৈরি করুন। তারা নির্ধারিত <b>ইউজারনেম</b> ও <b>পাসওয়ার্ড</b> দিয়ে লগ-ইন করে সার্ভারের সব ডেটা দেখতে পারবেন, তবে কোনো কিছু এডিট বা ডিলিট করতে পারবেন না।
+            </p>
+            <div class="form-grid" style="align-items:end;">
+              <div class="field-group" style="margin-bottom:0;">
+                <label class="field-label">সাব-অ্যাডমিন ইউজারনেম</label>
+                <input id="newSubAdminUser" type="text" class="input-ctrl" placeholder="যেমন: viewer1" />
+              </div>
+              <div class="field-group" style="margin-bottom:0;">
+                <label class="field-label">সাব-অ্যাডমিন পাসওয়ার্ড</label>
+                <input id="newSubAdminPass" type="password" class="input-ctrl" placeholder="কমপক্ষে ৪ অক্ষর" />
+              </div>
+              <div>
+                <button class="btn btn-success" style="width:100%; justify-content:center; padding:10px 15px;" onclick="createSubAdmin()">+ সাব-অ্যাডমিন যুক্ত করুন</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-box table-wrap">
+            <h3>📋 তৈরি করা সাব-অ্যাডমিন তালিকা</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>ইউজারনেম</th>
+                  <th>পারমিশন রোল</th>
+                  <th>স্ট্যাটাস</th>
+                  <th>তৈরির তারিখ</th>
+                  <th>সর্বশেষ লগ-ইন</th>
+                  <th>অ্যাকশন</th>
+                </tr>
+              </thead>
+              <tbody id="subAdminsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 17. MAIN ADMIN CREDENTIALS (USERNAME & PASSWORD) -->
+        <section id="sec_password" class="admin-sec hidden super-admin-only">
+          <div class="sec-title"><span>🔐 মেইন অ্যাডমিন ইউজারনেম ও পাসওয়ার্ড পরিবর্তন</span></div>
+          <div class="panel-box" style="max-width:440px;">
             <div class="field-group">
-              <label class="field-label">নতুন অ্যাডমিন পাসওয়ার্ড লিখুন</label>
+              <label class="field-label">মেইন অ্যাডমিন ইউজারনেম (খালি রাখলে ডিফল্ট 'admin')</label>
+              <input id="set_customAdminUsername" type="text" class="input-ctrl" placeholder="admin" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">নতুন মেইন অ্যাডমিন পাসওয়ার্ড লিখুন</label>
               <input id="set_customAdminPassword" type="text" class="input-ctrl" placeholder="নতুন শক্তিশালী পাসওয়ার্ড" />
             </div>
-            <button class="btn btn-warning" onclick="changeAdminPassword()">পাসওয়ার্ড আপডেট করুন</button>
+            <button class="btn btn-warning" onclick="changeAdminPassword()">লগ-ইন তথ্য আপডেট করুন</button>
           </div>
         </section>
 
@@ -822,9 +891,48 @@
   </div>
 
   <script>
+    let adminToken = localStorage.getItem('nexus_admin_token') || '';
     let adminPass = localStorage.getItem('nexus_admin_pass') || '';
+    let currentAdminRole = localStorage.getItem('nexus_admin_role') || 'super_admin';
+    let currentAdminUsername = localStorage.getItem('nexus_admin_username') || 'admin';
     let dashData = { users: [], payments: [], loginHistory: [], settings: {}, stats: {} };
     let currentUserFilter = 'all';
+
+    function getAdminAuthHeaders(extraHeaders = {}) {
+      const headers = { ...extraHeaders };
+      if (adminToken) headers['x-admin-token'] = adminToken;
+      if (adminPass) headers['x-admin-password'] = adminPass;
+      return headers;
+    }
+
+    function applyRolePermissionsUI() {
+      const isViewer = currentAdminRole === 'viewer';
+      const roleBadge = document.getElementById('adminRoleBadge');
+      const roBanner = document.getElementById('readOnlyBanner');
+
+      if (isViewer) {
+        roleBadge.textContent = `👁️ ${currentAdminUsername} (Read-Only)`;
+        roleBadge.className = 'badge badge-amber';
+        roBanner.classList.remove('hidden');
+
+        // Hide super-admin-only sections & sidebar items
+        document.querySelectorAll('.super-admin-only').forEach((el) => el.classList.add('hidden'));
+
+        // Disable all mutating buttons
+        document.querySelectorAll('.mutating-btn').forEach((btn) => {
+          btn.disabled = true;
+          btn.title = 'Read-Only মোড: আপনার এডিট বা ডিলিট করার অনুমতি নেই';
+        });
+      } else {
+        roleBadge.textContent = `👑 ${currentAdminUsername} (Main Admin)`;
+        roleBadge.className = 'badge badge-blue';
+        roBanner.classList.add('hidden');
+        document.querySelectorAll('.super-admin-only').forEach((el) => el.classList.remove('hidden'));
+        document.querySelectorAll('.mutating-btn').forEach((btn) => {
+          btn.disabled = false;
+        });
+      }
+    }
 
     function toggleSidebar(open) {
       document.getElementById('sidebar').classList.toggle('open', open);
@@ -835,11 +943,17 @@
     }
 
     function showSection(secId, el) {
+      if (currentAdminRole === 'viewer' && (secId === 'sec_sub_admins' || secId === 'sec_password')) {
+        return;
+      }
       document.querySelectorAll('.admin-sec').forEach((s) => s.classList.add('hidden'));
       document.getElementById(secId).classList.remove('hidden');
       document.querySelectorAll('.nav-item, .nav-subitem').forEach((b) => b.classList.remove('active'));
       if (el) el.classList.add('active');
       if (window.innerWidth <= 860) toggleSidebar(false);
+      if (secId === 'sec_sub_admins' && currentAdminRole === 'super_admin') {
+        loadSubAdmins();
+      }
     }
 
     function openFilteredUsers(filterMode, headingText, navEl) {
@@ -856,36 +970,51 @@
     }
 
     async function adminLogin() {
+      const username = document.getElementById('adminUserInput').value.trim();
       const pass = document.getElementById('adminPassInput').value.trim();
       const errEl = document.getElementById('adminLoginErr');
       errEl.textContent = '';
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pass })
+        body: JSON.stringify({ username, password: pass })
       });
       const data = await res.json();
       if (data.ok) {
-        adminPass = pass;
-        localStorage.setItem('nexus_admin_pass', pass);
+        adminToken = data.token || '';
+        currentAdminRole = data.role || 'super_admin';
+        currentAdminUsername = data.username || username || 'admin';
+        adminPass = currentAdminRole === 'super_admin' ? pass : '';
+
+        localStorage.setItem('nexus_admin_token', adminToken);
+        localStorage.setItem('nexus_admin_role', currentAdminRole);
+        localStorage.setItem('nexus_admin_username', currentAdminUsername);
+        if (adminPass) localStorage.setItem('nexus_admin_pass', adminPass);
+        else localStorage.removeItem('nexus_admin_pass');
+
         document.getElementById('adminLoginOverlay').classList.add('hidden');
         document.getElementById('adminShell').classList.remove('hidden');
+        applyRolePermissionsUI();
         loadDashboard();
       } else {
-        errEl.textContent = data.error || 'ভুল পাসওয়ার্ড!';
+        errEl.textContent = data.error || 'ভুল ইউজারনেম বা পাসওয়ার্ড!';
       }
     }
 
     function adminLogout() {
+      localStorage.removeItem('nexus_admin_token');
+      localStorage.removeItem('nexus_admin_role');
+      localStorage.removeItem('nexus_admin_username');
       localStorage.removeItem('nexus_admin_pass');
       location.reload();
     }
 
     async function loadDashboard() {
       const res = await fetch('/api/admin/dashboard', {
-        headers: { 'x-admin-password': adminPass }
+        headers: getAdminAuthHeaders()
       });
       if (res.status === 401) {
+        localStorage.removeItem('nexus_admin_token');
         localStorage.removeItem('nexus_admin_pass');
         document.getElementById('adminLoginOverlay').classList.remove('hidden');
         document.getElementById('adminShell').classList.add('hidden');
@@ -894,6 +1023,14 @@
       const data = await res.json();
       if (!data.ok) return;
       dashData = data;
+
+      if (data.adminUser) {
+        currentAdminRole = data.adminUser.role || currentAdminRole;
+        currentAdminUsername = data.adminUser.username || currentAdminUsername;
+        localStorage.setItem('nexus_admin_role', currentAdminRole);
+        localStorage.setItem('nexus_admin_username', currentAdminUsername);
+      }
+      applyRolePermissionsUI();
 
       const dbBadge = document.getElementById('dbStatusBadge');
       dbBadge.textContent = data.dbMode === 'mongodb' ? `MongoDB: ${data.dbName}` : 'Local JSON Mode';
@@ -907,6 +1044,9 @@
       renderPlansTable();
       populateUserDropdown();
       populateSettingsForm(data.settings || {});
+      if (currentAdminRole === 'super_admin') {
+        loadSubAdmins();
+      }
     }
 
     function renderStats() {
@@ -959,6 +1099,9 @@
         (u) => (u.name || '').toLowerCase().includes(q) || (u.phone || '').includes(q)
       );
 
+      const isViewer = currentAdminRole === 'viewer';
+      const disAttr = isViewer ? 'disabled title="Read-Only মোড: অনুমতি নেই"' : '';
+
       document.getElementById('usersTableBody').innerHTML = filtered.map((u) => `
         <tr>
           <td><b>${u.name || 'User'}</b><br><small style="color:#94a3b8;">+${u.phone}</small></td>
@@ -968,23 +1111,25 @@
           <td>${u.referralCount || 0}</td>
           <td><span class="badge ${u.status === 'active' ? 'badge-green' : 'badge-red'}">${u.status}</span></td>
           <td style="display:flex; gap:5px; flex-wrap:wrap;">
-            <button class="btn btn-primary btn-sm" onclick="openEditUser('${u.userId}')">✏️ ইডিট</button>
-            <button class="btn btn-success btn-sm" onclick="userAction('${u.userId}', 'extend', 60)">+৬০মি.</button>
-            <button class="btn btn-warning btn-sm" onclick="userAction('${u.userId}', '${u.status === 'active' ? 'ban' : 'unban'}')">${u.status === 'active' ? 'ব্যান' : 'আনব্যান'}</button>
-            <button class="btn btn-danger btn-sm" onclick="userAction('${u.userId}', 'delete')">ডিলিট</button>
+            <button class="btn btn-primary btn-sm" ${disAttr} onclick="openEditUser('${u.userId}')">✏️ ইডিট</button>
+            <button class="btn btn-success btn-sm" ${disAttr} onclick="userAction('${u.userId}', 'extend', 60)">+৬০মি.</button>
+            <button class="btn btn-warning btn-sm" ${disAttr} onclick="userAction('${u.userId}', '${u.status === 'active' ? 'ban' : 'unban'}')">${u.status === 'active' ? 'ব্যান' : 'আনব্যান'}</button>
+            <button class="btn btn-danger btn-sm" ${disAttr} onclick="userAction('${u.userId}', 'delete')">ডিলিট</button>
           </td>
         </tr>
       `).join('') || '<tr><td colspan="7" style="color:#94a3b8;">এই ফিল্টারে কোনো ইউজার পাওয়া যায়নি</td></tr>';
     }
 
     function renderBannedTable() {
+      const isViewer = currentAdminRole === 'viewer';
+      const disAttr = isViewer ? 'disabled title="Read-Only মোড: অনুমতি নেই"' : '';
       const banned = (dashData.users || []).filter((u) => u.status === 'banned');
       document.getElementById('bannedTableBody').innerHTML = banned.map((u) => `
         <tr>
           <td>${u.name}</td>
           <td>+${u.phone}</td>
           <td>${u.platform}</td>
-          <td><button class="btn btn-success btn-sm" onclick="userAction('${u.userId}', 'unban')">আনব্যান করুন</button></td>
+          <td><button class="btn btn-success btn-sm" ${disAttr} onclick="userAction('${u.userId}', 'unban')">আনব্যান করুন</button></td>
         </tr>
       `).join('') || '<tr><td colspan="4" style="color:#94a3b8;">কোনো ব্যানকৃত ইউজার নেই</td></tr>';
     }
@@ -1002,6 +1147,8 @@
     }
 
     function renderPaymentsTable() {
+      const isViewer = currentAdminRole === 'viewer';
+      const disAttr = isViewer ? 'disabled title="Read-Only মোড: অনুমতি নেই"' : '';
       document.getElementById('paymentsTableBody').innerHTML = (dashData.payments || []).map((p) => `
         <tr>
           <td><b>${p.trxId}</b></td>
@@ -1012,8 +1159,8 @@
           <td><span class="badge ${p.status === 'approved' ? 'badge-green' : p.status === 'rejected' ? 'badge-red' : 'badge-amber'}">${p.status}</span></td>
           <td>
             ${p.status === 'pending' ? `
-              <button class="btn btn-success btn-sm" onclick="paymentAction('${p.trxId}', 'approve')">Approve</button>
-              <button class="btn btn-danger btn-sm" onclick="paymentAction('${p.trxId}', 'reject')">Reject</button>
+              <button class="btn btn-success btn-sm" ${disAttr} onclick="paymentAction('${p.trxId}', 'approve')">Approve</button>
+              <button class="btn btn-danger btn-sm" ${disAttr} onclick="paymentAction('${p.trxId}', 'reject')">Reject</button>
             ` : '—'}
           </td>
         </tr>
@@ -1021,13 +1168,15 @@
     }
 
     function renderPlansTable() {
+      const isViewer = currentAdminRole === 'viewer';
+      const disAttr = isViewer ? 'disabled title="Read-Only মোড: অনুমতি নেই"' : '';
       const plans = dashData.settings?.plans || [];
       document.getElementById('plansTableBody').innerHTML = plans.map((p, idx) => `
         <tr>
           <td>${p.name}</td>
           <td>${p.minutes || (p.days * 1440)} মিনিট</td>
           <td>৳${p.price}</td>
-          <td><button class="btn btn-danger btn-sm" onclick="deletePlan(${idx})">মুছুন</button></td>
+          <td><button class="btn btn-danger btn-sm" ${disAttr} onclick="deletePlan(${idx})">মুছুন</button></td>
         </tr>
       `).join('');
     }
@@ -1044,7 +1193,7 @@
     async function loadUserMessages() {
       const userId = document.getElementById('msgUserSelect').value;
       if (!userId) return;
-      const res = await fetch(`/api/admin/messages/${userId}`, { headers: { 'x-admin-password': adminPass } });
+      const res = await fetch(`/api/admin/messages/${userId}`, { headers: getAdminAuthHeaders() });
       const data = await res.json();
       if (!data.ok) return;
 
@@ -1121,6 +1270,7 @@
       setVal('set_adScript', s.adScript);
       setVal('set_supportLabel', s.supportLabel);
       setVal('set_supportUrl', s.supportUrl);
+      setVal('set_customAdminUsername', s.customAdminUsername || '');
     }
 
     function syncToggle(key, checked) {
@@ -1193,6 +1343,7 @@
     }
 
     async function saveAllSettings() {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: আপনার সেভ করার অনুমতি নেই।');
       const payload = {
         siteTitle: document.getElementById('set_siteTitle').value,
         siteSubtitle: document.getElementById('set_siteSubtitle').value,
@@ -1236,7 +1387,7 @@
 
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -1244,11 +1395,12 @@
         alert('✅ সকল সেটিংস সফলভাবে সেভ হয়েছে!');
         loadDashboard();
       } else {
-        alert('সেভ করতে সমস্যা হয়েছে!');
+        alert(data.error || 'সেভ করতে সমস্যা হয়েছে!');
       }
     }
 
     async function addNewPlan() {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
       const name = document.getElementById('newPlanName').value.trim();
       const minutes = Number(document.getElementById('newPlanMinutes').value);
       const price = Number(document.getElementById('newPlanPrice').value);
@@ -1263,6 +1415,7 @@
     }
 
     async function deletePlan(idx) {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
       const plans = [...(dashData.settings?.plans || [])];
       plans.splice(idx, 1);
       dashData.settings.plans = plans;
@@ -1270,13 +1423,14 @@
     }
 
     async function manualAddUser() {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
       const name = document.getElementById('addUserName').value.trim();
       const phone = document.getElementById('addUserPhone').value.trim();
       const platform = document.getElementById('addUserPlatform').value;
       const minutes = Number(document.getElementById('addUserMinutes').value) || 60;
       const res = await fetch('/api/admin/users/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ name, phone, platform, minutes })
       });
       const data = await res.json();
@@ -1289,6 +1443,7 @@
     }
 
     function openEditUser(userId) {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
       const u = (dashData.users || []).find((x) => x.userId === userId);
       if (!u) return;
       document.getElementById('edit_userId').value = u.userId;
@@ -1305,6 +1460,7 @@
     }
 
     async function submitEditUser() {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
       const userId = document.getElementById('edit_userId').value;
       const payload = {
         name: document.getElementById('edit_userName').value,
@@ -1315,54 +1471,161 @@
       };
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.ok) {
         closeEditModal();
         loadDashboard();
+      } else {
+        alert(data.error || 'সমস্যা হয়েছে');
       }
     }
 
     async function userAction(userId, action, minutes = 60) {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
       if (action === 'delete' && !confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে ডিলিট করতে চান?')) return;
-      await fetch(`/api/admin/users/${userId}/action`, {
+      const res = await fetch(`/api/admin/users/${userId}/action`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action, minutes })
       });
+      const data = await res.json();
+      if (!data.ok && data.error) alert(data.error);
       loadDashboard();
     }
 
     async function paymentAction(trxId, action) {
-      await fetch(`/api/admin/payments/${trxId}/action`, {
+      if (currentAdminRole === 'viewer') return alert('Read-Only মোড: অনুমতি নেই।');
+      const res = await fetch(`/api/admin/payments/${trxId}/action`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action })
       });
+      const data = await res.json();
+      if (!data.ok && data.error) alert(data.error);
       loadDashboard();
     }
 
     async function changeAdminPassword() {
+      if (currentAdminRole !== 'super_admin') return alert('শুধুমাত্র মেইন অ্যাডমিন এটি পরিবর্তন করতে পারবেন।');
+      const newUser = document.getElementById('set_customAdminUsername').value.trim();
       const newPass = document.getElementById('set_customAdminPassword').value.trim();
       if (newPass.length < 4) return alert('কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন।');
+      const payload = { customAdminPassword: newPass };
+      if (newUser) payload.customAdminUsername = newUser;
+
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
-        body: JSON.stringify({ customAdminPassword: newPass })
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.ok) {
         adminPass = newPass;
         localStorage.setItem('nexus_admin_pass', newPass);
-        alert('✅ অ্যাডমিন পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে!');
+        if (newUser) {
+          currentAdminUsername = newUser;
+          localStorage.setItem('nexus_admin_username', newUser);
+        }
+        alert('✅ মেইন অ্যাডমিনের ইউজারনেম ও পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে! অনুগ্রহ করে পুনরায় লগ-ইন করুন।');
+        adminLogout();
+      } else {
+        alert(data.error || 'সমস্যা হয়েছে');
       }
     }
 
-    if (adminPass) {
+    // Sub-Admin Management Functions (Main Admin Only)
+    async function loadSubAdmins() {
+      if (currentAdminRole !== 'super_admin') return;
+      const res = await fetch('/api/admin/sub-admins', {
+        headers: getAdminAuthHeaders()
+      });
+      const data = await res.json();
+      if (!data.ok) return;
+
+      const tbody = document.getElementById('subAdminsTableBody');
+      tbody.innerHTML = (data.admins || []).map((a) => `
+        <tr>
+          <td><b>${a.username}</b></td>
+          <td><span class="badge badge-blue">Read-Only (শুধু দেখা)</span></td>
+          <td><span class="badge ${a.status === 'active' ? 'badge-green' : 'badge-red'}">${a.status === 'active' ? 'Active' : 'Disabled'}</span></td>
+          <td>${a.createdAt ? new Date(a.createdAt).toLocaleDateString('bn-BD') : '—'}</td>
+          <td>${a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleString('bn-BD') : 'এখনো লগ-ইন করেনি'}</td>
+          <td style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="resetSubAdminPass('${a._id}', '${a.username}')">🔑 পাসওয়ার্ড</button>
+            <button class="btn btn-warning btn-sm" onclick="toggleSubAdminStatus('${a._id}', '${a.status === 'active' ? 'disabled' : 'active'}')">${a.status === 'active' ? 'নিষ্ক্রিয়' : 'সক্রিয়'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSubAdmin('${a._id}', '${a.username}')">ডিলিট</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" style="color:#94a3b8;">কোনো সাব-অ্যাডমিন তৈরি করা হয়নি</td></tr>';
+    }
+
+    async function createSubAdmin() {
+      const username = document.getElementById('newSubAdminUser').value.trim();
+      const password = document.getElementById('newSubAdminPass').value.trim();
+      if (!username || username.length < 3) return alert('কমপক্ষে ৩ অক্ষরের ইউজারনেম দিন।');
+      if (!password || password.length < 4) return alert('কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন।');
+
+      const res = await fetch('/api/admin/sub-admins', {
+        method: 'POST',
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        alert('✅ নতুন Read-Only সাব-অ্যাডমিন সফলভাবে যুক্ত হয়েছে!');
+        document.getElementById('newSubAdminUser').value = '';
+        document.getElementById('newSubAdminPass').value = '';
+        loadSubAdmins();
+      } else {
+        alert(data.error || 'সাব-অ্যাডমিন তৈরি করতে সমস্যা হয়েছে।');
+      }
+    }
+
+    async function resetSubAdminPass(id, username) {
+      const newPass = prompt(`"${username}" এর জন্য নতুন পাসওয়ার্ড লিখুন (কমপক্ষে ৪ অক্ষর):`);
+      if (!newPass) return;
+      if (newPass.trim().length < 4) return alert('কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন।');
+
+      const res = await fetch(`/api/admin/sub-admins/${id}`, {
+        method: 'PUT',
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ password: newPass.trim() })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        alert('✅ সাব-অ্যাডমিনের পাসওয়ার্ড আপডেট হয়েছে!');
+      } else {
+        alert(data.error || 'সমস্যা হয়েছে');
+      }
+    }
+
+    async function toggleSubAdminStatus(id, newStatus) {
+      const res = await fetch(`/api/admin/sub-admins/${id}`, {
+        method: 'PUT',
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (data.ok) loadSubAdmins();
+    }
+
+    async function deleteSubAdmin(id, username) {
+      if (!confirm(`আপনি কি নিশ্চিতভাবে সাব-অ্যাডমিন "${username}" কে ডিলিট করতে চান?`)) return;
+      const res = await fetch(`/api/admin/sub-admins/${id}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.ok) loadSubAdmins();
+    }
+
+    if (adminToken || adminPass) {
       document.getElementById('adminLoginOverlay').classList.add('hidden');
       document.getElementById('adminShell').classList.remove('hidden');
+      applyRolePermissionsUI();
       loadDashboard();
     }
   </script>
