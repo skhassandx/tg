@@ -1,7 +1,7 @@
 {
-  "name": "wa-tg-login-project",
-  "version": "1.0.0",
-  "description": "WhatsApp and Telegram Login via Phone Number or QR Code",
+  "name": "dynamic-wa-tg-saas",
+  "version": "2.0.0",
+  "description": "Dynamic WhatsApp & Telegram Login with Admin Panel & Subscription System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,7 +11,6 @@
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.2",
     "whatsapp-web.js": "^1.23.0",
-    "telegram": "^2.24.4",
-    "input": "^1.0.1"
+    "telegram": "^2.24.4"
   }
 }
