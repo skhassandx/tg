@@ -94,10 +94,18 @@
       gap: 12px; margin-bottom: 20px;
     }
     .stat-card {
-      background: #111827; border: 1px solid rgba(148, 163, 184, 0.14);
+      background: #111827; border: 1px solid rgba(148, 163, 184, 0.16);
       border-radius: 14px; padding: 15px;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
     }
-    .stat-label { font-size: 13px; color: #94a3b8; }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.55);
+      background: #162033;
+    }
+    .stat-card:active { transform: translateY(0); }
+    .stat-label { font-size: 13px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
     .stat-val { font-size: 24px; font-weight: 700; color: #f8fafc; margin-top: 4px; }
 
     .panel-box {
@@ -222,7 +230,7 @@
           <span>👥 ইউজার ম্যানেজমেন্ট</span><span>▾</span>
         </button>
         <div id="grp_users" class="nav-sublist">
-          <button class="nav-subitem" data-sec="sec_users" onclick="showSection('sec_users', this)">• সকল ইউজার লিস্ট</button>
+          <button class="nav-subitem" id="nav_sec_users" data-sec="sec_users" onclick="openFilteredUsers('all', 'সকল ইউজার লিস্ট', this)">• সকল ইউজার লিস্ট</button>
           <button class="nav-subitem" data-sec="sec_add_user" onclick="showSection('sec_add_user', this)">• + নতুন ইউজার যোগ করুন</button>
           <button class="nav-subitem" data-sec="sec_banned" onclick="showSection('sec_banned', this)">• ব্যানকৃত ইউজার (Banned)</button>
           <button class="nav-subitem" data-sec="sec_history" onclick="showSection('sec_history', this)">• লগ-ইন হিস্ট্রি</button>
@@ -235,12 +243,12 @@
           <span>💳 পেমেন্ট সিস্টেম</span><span>▾</span>
         </button>
         <div id="grp_payment" class="nav-sublist">
-          <button class="nav-subitem" data-sec="sec_payments" onclick="showSection('sec_payments', this)">• পেমেন্ট হিস্ট্রি ও অনুমোদন</button>
+          <button class="nav-subitem" id="nav_sec_payments" data-sec="sec_payments" onclick="showSection('sec_payments', this)">• পেমেন্ট হিস্ট্রি ও অনুমোদন</button>
           <button class="nav-subitem" data-sec="sec_pay_settings" onclick="showSection('sec_pay_settings', this)">• পেমেন্ট নাম্বার ও বাংলা QR</button>
         </div>
 
         <button class="nav-item" data-sec="sec_plans" onclick="showSection('sec_plans', this)">⏳ সাবস্ক্রিপশন ও ফ্রি ট্রায়াল</button>
-        <button class="nav-item" data-sec="sec_referral" onclick="showSection('sec_referral', this)">🎁 রেফারেল সিস্টেম</button>
+        <button class="nav-item" id="nav_sec_referral" data-sec="sec_referral" onclick="showSection('sec_referral', this)">🎁 রেফারেল সিস্টেম</button>
         <button class="nav-item" data-sec="sec_notice" onclick="showSection('sec_notice', this)">📢 নোটিশ বার</button>
         <button class="nav-item" data-sec="sec_ads" onclick="showSection('sec_ads', this)">📺 অ্যাডস নেটওয়ার্ক</button>
 
@@ -273,7 +281,7 @@
 
       <div class="content-wrap">
 
-        <!-- 1. DASHBOARD OVERVIEW -->
+        <!-- 1. DASHBOARD OVERVIEW (CLICKABLE STAT CARDS LIKE v2) -->
         <section id="sec_dashboard" class="admin-sec">
           <div class="sec-title">
             <span>📊 লাইভ ড্যাশবোর্ড ও কুইক কন্ট্রোল</span>
@@ -326,10 +334,13 @@
           </div>
         </section>
 
-        <!-- 2. ALL USERS LIST -->
+        <!-- 2. ALL USERS LIST (WITH DASHBOARD CLICK FILTERS) -->
         <section id="sec_users" class="admin-sec hidden">
           <div class="sec-title">
-            <span>👥 সকল ইউজার লিস্ট</span>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span id="usersSecHeading">👥 সকল ইউজার লিস্ট</span>
+              <button id="resetUserFilterBtn" class="btn btn-slate btn-sm hidden" onclick="openFilteredUsers('all', 'সকল ইউজার লিস্ট', document.getElementById('nav_sec_users'))">সব দেখান (Reset)</button>
+            </div>
             <input id="userSearchInput" type="text" class="input-ctrl" style="max-width:250px;" placeholder="নাম বা নাম্বার খুঁজুন..." oninput="renderUsersTable()" />
           </div>
           <div class="panel-box table-wrap">
@@ -508,7 +519,7 @@
                 <div class="toggle-info-title">নতুন ইউজারদের জন্য ফ্রি ট্রায়াল চালু রাখুন</div>
                 <div class="toggle-info-sub">নতুন অ্যাকাউন্ট খুললেই নিচের নির্ধারিত মিনিট ফ্রি পাবে</div>
               </div>
-              <label class="switch"><input type="checkbox" id="set_freeTrialEnabled"><span class="slider"></span></label>
+              <label class="switch"><input type="checkbox" id="set_freeTrialEnabled" onchange="syncToggle('freeTrialEnabled', this.checked)"><span class="slider"></span></label>
             </div>
 
             <div class="field-group" style="max-width:420px;">
@@ -579,7 +590,7 @@
                 <div class="toggle-info-title">হোমপেজে স্ক্রলিং নোটিশ বার দেখান</div>
                 <div class="toggle-info-sub">চালু থাকলে লগ-ইন কার্ডের ওপরে নোটিশ চলবে</div>
               </div>
-              <label class="switch"><input type="checkbox" id="set_noticeEnabled"><span class="slider"></span></label>
+              <label class="switch"><input type="checkbox" id="set_noticeEnabled" onchange="syncToggle('noticeEnabled', this.checked)"><span class="slider"></span></label>
             </div>
             <div class="field-group">
               <label class="field-label">নোটিশ টেক্সট</label>
@@ -598,7 +609,7 @@
                 <div class="toggle-info-title">অ্যাডস ডিসপ্লে চালু রাখুন</div>
                 <div class="toggle-info-sub">বন্ধ করলে সাইটের সব বিজ্ঞাপন কোড হাইড থাকবে</div>
               </div>
-              <label class="switch"><input type="checkbox" id="set_adsEnabled"><span class="slider"></span></label>
+              <label class="switch"><input type="checkbox" id="set_adsEnabled" onchange="syncToggle('adsEnabled', this.checked)"><span class="slider"></span></label>
             </div>
             <div class="field-group">
               <label class="field-label">Top Banner Ad Code (লগ-ইন কার্ডের ওপরে)</label>
@@ -619,13 +630,20 @@
             <button class="btn btn-success btn-sm" onclick="saveAllSettings()">💾 সেভ করুন</button>
           </div>
           <div class="panel-box">
-            <div class="field-group" style="max-width:420px;">
-              <label class="field-label">লগ-ইন পদ্ধতি মোড (Login Method Control)</label>
-              <select id="set_loginMethodMode" class="select-ctrl" onchange="syncSelect('loginMethodMode', this.value)">
-                <option value="both">উভয় পদ্ধতি (নাম্বার + QR Code)</option>
-                <option value="phone_only">শুধুমাত্র নাম্বার দিয়ে (Pairing Code / OTP)</option>
-                <option value="qr_only">শুধুমাত্র QR Code দিয়ে</option>
-              </select>
+            <div class="form-grid" style="margin-bottom:12px;">
+              <div class="field-group">
+                <label class="field-label">লগ-ইন পদ্ধতি মোড (Login Method Control)</label>
+                <select id="set_loginMethodMode" class="select-ctrl" onchange="syncSelect('loginMethodMode', this.value)">
+                  <option value="both">উভয় পদ্ধতি (নাম্বার + QR Code)</option>
+                  <option value="phone_only">শুধুমাত্র নাম্বার দিয়ে (Pairing Code / OTP)</option>
+                  <option value="qr_only">শুধুমাত্র QR Code দিয়ে</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">🔒 ইউজার লগ-ইন সেশন সময়কাল (মিনিট)</label>
+                <input id="f_loginSessionMinutes" type="number" min="1" class="input-ctrl" value="1440" oninput="syncInput('loginSessionMinutes', this.value)" />
+                <small style="color:#94a3b8;">পৃষ্ঠা রিলোড দিলেও এত মিনিট ইউজার লগ-ইন অবস্থায় থাকবে</small>
+              </div>
             </div>
 
             <div class="form-grid">
@@ -682,9 +700,9 @@
           </div>
         </section>
 
-        <!-- 14. GENERAL & BACKGROUND IMAGE UPLOAD -->
+        <!-- 14. GENERAL, LOGIN SESSION DURATION & BACKGROUND IMAGE UPLOAD -->
         <section id="sec_general" class="admin-sec hidden">
-          <div class="sec-title"><span>🎨 জেনারেল ও ব্যাকগ্রাউন্ড ইমেজ সেটিংস</span></div>
+          <div class="sec-title"><span>🎨 জেনারেল, লগ-ইন সেশন ও ব্যাকগ্রাউন্ড ইমেজ সেটিংস</span></div>
           <div class="panel-box">
             <div class="form-grid">
               <div class="field-group">
@@ -703,8 +721,21 @@
             </div>
 
             <div class="field-group">
-              <label class="field-label">লগ-ইন সফল হওয়ার পর রিডাইরেক্ট লিংক (ঐচ্ছিক — ফাঁকা রাখলে ইউজার ড্যাশবোর্ড দেখাবে)</label>
+              <label class="field-label">লগ-ইন সফল হওয়ার পর রিডাইরেক্ট লিংক (ঐচ্ছিক — ফাঁকা রাখলে ইউজার প্রোফাইল ও প্যানেল ওপেন হবে)</label>
               <input id="set_postLoginRedirectUrl" type="text" class="input-ctrl" placeholder="https://example.com/dashboard" />
+            </div>
+
+            <!-- Login Session Duration Setting -->
+            <div class="panel-box" style="background:#1e293b; margin-top:10px;">
+              <label class="field-label">🔒 ইউজার লগ-ইন সেশন সময়কাল (মিনিট — একবার লগ-ইন করলে কত সময় লগ-ইন থাকবে)</label>
+              <input id="set_loginSessionMinutes" type="number" min="1" class="input-ctrl" style="max-width:340px;" value="1440" oninput="syncInput('loginSessionMinutes', this.value)" />
+              <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                <button type="button" class="btn btn-slate btn-sm" onclick="setSessionPreset(60)">৬০ মিনিট (১ ঘণ্টা)</button>
+                <button type="button" class="btn btn-slate btn-sm" onclick="setSessionPreset(720)">৭২০ মিনিট (১২ ঘণ্টা)</button>
+                <button type="button" class="btn btn-slate btn-sm" onclick="setSessionPreset(1440)">১৪৪০ মিনিট (১ দিন / ২৪ ঘণ্টা)</button>
+                <button type="button" class="btn btn-slate btn-sm" onclick="setSessionPreset(4320)">৪৩২০ মিনিট (৩ দিন)</button>
+                <button type="button" class="btn btn-slate btn-sm" onclick="setSessionPreset(10080)">১০০৮০ মিনিট (৭ দিন)</button>
+              </div>
             </div>
 
             <!-- Background Image Upload -->
@@ -793,6 +824,7 @@
   <script>
     let adminPass = localStorage.getItem('nexus_admin_pass') || '';
     let dashData = { users: [], payments: [], loginHistory: [], settings: {}, stats: {} };
+    let currentUserFilter = 'all';
 
     function toggleSidebar(open) {
       document.getElementById('sidebar').classList.toggle('open', open);
@@ -808,6 +840,19 @@
       document.querySelectorAll('.nav-item, .nav-subitem').forEach((b) => b.classList.remove('active'));
       if (el) el.classList.add('active');
       if (window.innerWidth <= 860) toggleSidebar(false);
+    }
+
+    function openFilteredUsers(filterMode, headingText, navEl) {
+      currentUserFilter = filterMode || 'all';
+      document.getElementById('usersSecHeading').textContent = '👥 ' + (headingText || 'সকল ইউজার লিস্ট');
+      const resetBtn = document.getElementById('resetUserFilterBtn');
+      if (currentUserFilter === 'all') {
+        resetBtn.classList.add('hidden');
+      } else {
+        resetBtn.classList.remove('hidden');
+      }
+      showSection('sec_users', navEl || document.getElementById('nav_sec_users'));
+      renderUsersTable();
     }
 
     async function adminLogin() {
@@ -867,17 +912,20 @@
     function renderStats() {
       const s = dashData.stats || {};
       const items = [
-        { label: 'মোট ইউজার', val: s.totalUsers || 0 },
-        { label: 'WhatsApp ইউজার', val: s.waUsers || 0 },
-        { label: 'Telegram ইউজার', val: s.tgUsers || 0 },
-        { label: 'অ্যাক্টিভ সাবস্ক্রিপশন', val: s.activeSubs || 0 },
-        { label: 'QR লগ-ইন', val: s.qrUsers || 0 },
-        { label: 'নাম্বার লগ-ইন', val: s.manualOrPhoneUsers || 0 },
-        { label: 'মোট রেফারেল', val: s.totalReferrals || 0 },
-        { label: 'মোট আয় (৳)', val: '৳' + (s.totalRevenue || 0) }
+        { label: 'মোট ইউজার', val: s.totalUsers || 0, action: "openFilteredUsers('all', 'সকল ইউজার লিস্ট')" },
+        { label: 'WhatsApp ইউজার', val: s.waUsers || 0, action: "openFilteredUsers('whatsapp', 'WhatsApp ইউজার লিস্ট')" },
+        { label: 'Telegram ইউজার', val: s.tgUsers || 0, action: "openFilteredUsers('telegram', 'Telegram ইউজার লিস্ট')" },
+        { label: 'অ্যাক্টিভ সাবস্ক্রিপশন', val: s.activeSubs || 0, action: "openFilteredUsers('active_sub', 'অ্যাক্টিভ সাবস্ক্রিপশন ইউজার')" },
+        { label: 'QR লগ-ইন', val: s.qrUsers || 0, action: "openFilteredUsers('qr', 'QR Code লগ-ইন ইউজার')" },
+        { label: 'নাম্বার লগ-ইন', val: s.manualOrPhoneUsers || 0, action: "openFilteredUsers('phone', 'নাম্বার / ম্যানুয়াল লগ-ইন ইউজার')" },
+        { label: 'মোট রেফারেল', val: s.totalReferrals || 0, action: "showSection('sec_referral', document.getElementById('nav_sec_referral'))" },
+        { label: 'মোট আয় (৳)', val: '৳' + (s.totalRevenue || 0), action: "showSection('sec_payments', document.getElementById('nav_sec_payments'))" }
       ];
       document.getElementById('statsCardsGrid').innerHTML = items.map(
-        (i) => `<div class="stat-card"><div class="stat-label">${i.label}</div><div class="stat-val">${i.val}</div></div>`
+        (i) => `<div class="stat-card" onclick="${i.action}" title="বিস্তারিত দেখতে ক্লিক করুন">
+          <div class="stat-label"><span>${i.label}</span><span style="color:#38bdf8; font-size:12px;">↗</span></div>
+          <div class="stat-val">${i.val}</div>
+        </div>`
       ).join('');
     }
 
@@ -893,9 +941,24 @@
 
     function renderUsersTable() {
       const q = (document.getElementById('userSearchInput').value || '').toLowerCase();
-      const filtered = (dashData.users || []).filter(
+      let list = dashData.users || [];
+
+      if (currentUserFilter === 'whatsapp') {
+        list = list.filter((u) => u.platform === 'whatsapp');
+      } else if (currentUserFilter === 'telegram') {
+        list = list.filter((u) => u.platform === 'telegram');
+      } else if (currentUserFilter === 'active_sub') {
+        list = list.filter((u) => u.status === 'active' && new Date(u.expiresAt) > new Date());
+      } else if (currentUserFilter === 'qr') {
+        list = list.filter((u) => u.method === 'qr');
+      } else if (currentUserFilter === 'phone') {
+        list = list.filter((u) => u.method !== 'qr');
+      }
+
+      const filtered = list.filter(
         (u) => (u.name || '').toLowerCase().includes(q) || (u.phone || '').includes(q)
       );
+
       document.getElementById('usersTableBody').innerHTML = filtered.map((u) => `
         <tr>
           <td><b>${u.name || 'User'}</b><br><small style="color:#94a3b8;">+${u.phone}</small></td>
@@ -911,7 +974,7 @@
             <button class="btn btn-danger btn-sm" onclick="userAction('${u.userId}', 'delete')">ডিলিট</button>
           </td>
         </tr>
-      `).join('');
+      `).join('') || '<tr><td colspan="7" style="color:#94a3b8;">এই ফিল্টারে কোনো ইউজার পাওয়া যায়নি</td></tr>';
     }
 
     function renderBannedTable() {
@@ -1030,6 +1093,8 @@
       setVal('set_siteSubtitle', s.siteSubtitle);
       setVal('set_customLoginNote', s.customLoginNote);
       setVal('set_postLoginRedirectUrl', s.postLoginRedirectUrl);
+      setVal('set_loginSessionMinutes', s.loginSessionMinutes ?? 1440);
+      setVal('f_loginSessionMinutes', s.loginSessionMinutes ?? 1440);
       setVal('set_bgUrl', s.bgUrl);
       updateImgPreview('set_bgUrl', 'bgPreviewImg');
 
@@ -1070,6 +1135,17 @@
         const el = document.getElementById(id);
         if (el) el.value = val;
       });
+    }
+
+    function syncInput(key, val) {
+      ['set_' + key, 'f_' + key].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el && el.value !== String(val)) el.value = val;
+      });
+    }
+
+    function setSessionPreset(mins) {
+      syncInput('loginSessionMinutes', mins);
     }
 
     // Client-side Canvas Image Compressor & Uploader (Bangla QR & Background)
@@ -1122,6 +1198,7 @@
         siteSubtitle: document.getElementById('set_siteSubtitle').value,
         customLoginNote: document.getElementById('set_customLoginNote').value,
         postLoginRedirectUrl: document.getElementById('set_postLoginRedirectUrl').value,
+        loginSessionMinutes: Math.max(1, Number(document.getElementById('set_loginSessionMinutes').value) || 1440),
         bgUrl: document.getElementById('set_bgUrl').value,
         whatsappEnabled: document.getElementById('set_whatsappEnabled').checked,
         telegramEnabled: document.getElementById('set_telegramEnabled').checked,
