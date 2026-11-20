@@ -1,8 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
+const { MongoClient } = require('mongodb');
 const qrcode = require('qrcode');
 const { Server } = require('socket.io');
 const fs = require('fs');
@@ -16,77 +18,183 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 
 const DB_FILE = path.join(__dirname, 'database.json');
+const MONGODB_URI = (process.env.MONGODB_URI || '').trim();
 
-function loadDB() {
-    if (!fs.existsSync(DB_FILE)) {
-        const initial = {
-            settings: {
-                appName: 'NexusPortal Pro',
-                bgImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe',
-                redirectUrl: 'https://example.com',
-                freeTrialMinutes: 15,
-                enableReferral: true,
-                referralBonusMinutes: 30,
-                paymentNumber: '01818896166',
-                paymentNote: 'Send Money / Payment করে নিচে রেফারেন্স নাম্বার ও Transaction ID দিন।',
-                banglaQrImage: '',
-                enableWhatsApp: true,
-                enableTelegram: true,
-                adminPassword: process.env.ADMIN_PASSWORD || 'admin123'
-            },
-            plans: [
-                { id: 'plan_1', name: '১ দিন স্টার্টার', durationMinutes: 1440, price: 20 },
-                { id: 'plan_7', name: '৭ দিন প্রিমিয়াম', durationMinutes: 10080, price: 100 },
-                { id: 'plan_30', name: '৩০ দিন ভিআইপি', durationMinutes: 43200, price: 300 }
-            ],
-            users: [],
-            loginHistory: [],
-            notices: [
-                {
-                    id: 'NTC-INIT',
-                    target: 'all',
-                    title: 'স্বাগতম!',
-                    message: 'আমাদের প্ল্যাটফর্মে আপনাকে স্বাগতম। ফ্রি ট্রায়াল শেষে পছন্দের প্যাকেজ অ্যাক্টিভ করুন।',
-                    createdAt: Date.now()
-                }
-            ],
-            payments: []
-        };
-        fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
-        return initial;
-    }
-    const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    if (!parsed.loginHistory) parsed.loginHistory = [];
-    return parsed;
+let mongoClient = null;
+let mongoDb = null;
+let dbStatus = {
+    connected: false,
+    mode: 'local_json',
+    dbName: 'database.json',
+    message: 'MONGODB_URI সেট করা নেই (Local JSON মোড চলছে)'
+};
+
+function getDefaultData() {
+    return {
+        settings: {
+            appName: 'NexusPortal Pro',
+            bgImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe',
+            redirectUrl: 'https://example.com',
+            freeTrialMinutes: 15,
+            enableReferral: true,
+            referralBonusMinutes: 30,
+            paymentNumber: '01818896166',
+            paymentNote: 'Send Money / Payment করে নিচে রেফারেন্স নাম্বার ও Transaction ID দিন।',
+            banglaQrImage: '',
+            enableWhatsApp: true,
+            enableTelegram: true,
+            adminPassword: process.env.ADMIN_PASSWORD || 'admin123'
+        },
+        plans: [
+            { id: 'plan_1', name: '১ দিন স্টার্টার', durationMinutes: 1440, price: 20 },
+            { id: 'plan_7', name: '৭ দিন প্রিমিয়াম', durationMinutes: 10080, price: 100 },
+            { id: 'plan_30', name: '৩০ দিন ভিআইপি', durationMinutes: 43200, price: 300 }
+        ],
+        users: [],
+        loginHistory: [],
+        notices: [
+            {
+                id: 'NTC-INIT',
+                target: 'all',
+                title: 'স্বাগতম!',
+                message: 'আমাদের প্ল্যাটফর্মে আপনাকে স্বাগতম। ফ্রি ট্রায়াল শেষে পছন্দের প্যাকেজ অ্যাক্টিভ করুন।',
+                createdAt: Date.now()
+            }
+        ],
+        payments: []
+    };
 }
 
-function saveDB(db) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+let state = getDefaultData();
+
+async function initDatabase() {
+    if (MONGODB_URI) {
+        try {
+            mongoClient = new MongoClient(MONGODB_URI);
+            await mongoClient.connect();
+            mongoDb = mongoClient.db();
+
+            const settingsDoc = await mongoDb.collection('settings').findOne({ _id: 'global_settings' });
+            const plansDocs = await mongoDb.collection('plans').find({}).toArray();
+            const usersDocs = await mongoDb.collection('users').find({}).sort({ createdAt: -1 }).toArray();
+            const historyDocs = await mongoDb.collection('login_history').find({}).sort({ timestamp: -1 }).limit(500).toArray();
+            const noticesDocs = await mongoDb.collection('notices').find({}).sort({ createdAt: -1 }).toArray();
+            const paymentsDocs = await mongoDb.collection('payments').find({}).sort({ createdAt: -1 }).toArray();
+
+            if (!settingsDoc) {
+                const defaults = getDefaultData();
+                state = defaults;
+                await mongoDb.collection('settings').insertOne({ _id: 'global_settings', ...defaults.settings });
+                if (defaults.plans.length) await mongoDb.collection('plans').insertMany(defaults.plans);
+                if (defaults.notices.length) await mongoDb.collection('notices').insertMany(defaults.notices);
+            } else {
+                const { _id, ...cleanSettings } = settingsDoc;
+                state = {
+                    settings: { ...getDefaultData().settings, ...cleanSettings },
+                    plans: plansDocs.map(({ _id, ...p }) => p),
+                    users: usersDocs.map(({ _id, ...u }) => u),
+                    loginHistory: historyDocs.map(({ _id, ...l }) => l),
+                    notices: noticesDocs.map(({ _id, ...n }) => n),
+                    payments: paymentsDocs.map(({ _id, ...pay }) => pay)
+                };
+            }
+
+            dbStatus = {
+                connected: true,
+                mode: 'mongodb',
+                dbName: mongoDb.databaseName || 'nexus_saas',
+                message: 'MongoDB Atlas ক্লাউড ডাটাবেস সংযুক্ত আছে'
+            };
+            console.log(`Connected to MongoDB Atlas (${dbStatus.dbName})`);
+            return;
+        } catch (err) {
+            console.error('MongoDB Atlas connection failed, falling back to local JSON:', err.message);
+            dbStatus = {
+                connected: false,
+                mode: 'local_json_fallback',
+                dbName: 'database.json',
+                message: 'MongoDB কানেকশন ত্রুটি: ' + err.message
+            };
+        }
+    }
+
+    // Local JSON fallback
+    if (!fs.existsSync(DB_FILE)) {
+        state = getDefaultData();
+        fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2));
+    } else {
+        const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        state = { ...getDefaultData(), ...parsed };
+    }
+}
+
+async function syncMongoCollections() {
+    if (!mongoDb) return;
+    try {
+        await mongoDb.collection('settings').updateOne(
+            { _id: 'global_settings' },
+            { $set: state.settings },
+            { upsert: true }
+        );
+
+        await mongoDb.collection('plans').deleteMany({});
+        if (state.plans.length) {
+            await mongoDb.collection('plans').insertMany(state.plans.map(p => ({ ...p })));
+        }
+
+        await mongoDb.collection('users').deleteMany({});
+        if (state.users.length) {
+            await mongoDb.collection('users').insertMany(state.users.map(u => ({ ...u })));
+        }
+
+        await mongoDb.collection('notices').deleteMany({});
+        if (state.notices.length) {
+            await mongoDb.collection('notices').insertMany(state.notices.map(n => ({ ...n })));
+        }
+
+        await mongoDb.collection('payments').deleteMany({});
+        if (state.payments.length) {
+            await mongoDb.collection('payments').insertMany(state.payments.map(p => ({ ...p })));
+        }
+
+        await mongoDb.collection('login_history').deleteMany({});
+        if (state.loginHistory.length) {
+            await mongoDb.collection('login_history').insertMany(state.loginHistory.slice(0, 500).map(l => ({ ...l })));
+        }
+    } catch (err) {
+        console.error('MongoDB sync error:', err.message);
+    }
+}
+
+function saveDB() {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2));
+    } catch (e) {}
+    syncMongoCollections();
 }
 
 function generateRefCode() {
     return 'REF' + Math.floor(10000 + Math.random() * 90000);
 }
 
-function recordLoginHistory(db, entry) {
-    db.loginHistory.unshift({
+function recordLoginHistory(entry) {
+    state.loginHistory.unshift({
         id: 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
         timestamp: Date.now(),
         ...entry
     });
-    if (db.loginHistory.length > 500) {
-        db.loginHistory = db.loginHistory.slice(0, 500);
+    if (state.loginHistory.length > 500) {
+        state.loginHistory = state.loginHistory.slice(0, 500);
     }
 }
 
-function processUserLogin({ phone, platform, method, sessionString = '', refCode = '', ip = 'Unknown', userAgent = 'Unknown' }) {
-    const db = loadDB();
+function processUserLogin({ phone, platform, method, sessionString = '', refCode = '', ip = 'Unknown', userAgent = 'Unknown', displayName = '' }) {
     const now = Date.now();
     const today = new Date().toISOString().split('T')[0];
-    let user = db.users.find(u => u.phone === phone && u.platform === platform);
+    let user = state.users.find(u => u.phone === phone && u.platform === platform);
 
     if (user && user.status === 'banned') {
-        recordLoginHistory(db, {
+        recordLoginHistory({
             userId: user.id,
             phone,
             platform,
@@ -95,18 +203,18 @@ function processUserLogin({ phone, platform, method, sessionString = '', refCode
             userAgent,
             status: 'blocked'
         });
-        saveDB(db);
+        saveDB();
         return { banned: true, banReason: user.banReason || 'নিয়ম ভঙ্গের কারণে অ্যাকাউন্ট ব্যান করা হয়েছে।' };
     }
 
     if (!user) {
-        let trialMinutes = Number(db.settings.freeTrialMinutes || 15);
+        let trialMinutes = Number(state.settings.freeTrialMinutes || 15);
         let referredBy = null;
 
-        if (db.settings.enableReferral && refCode) {
-            const referrer = db.users.find(u => u.referralCode && u.referralCode.toLowerCase() === refCode.trim().toLowerCase());
+        if (state.settings.enableReferral && refCode) {
+            const referrer = state.users.find(u => u.referralCode && u.referralCode.toLowerCase() === refCode.trim().toLowerCase());
             if (referrer && referrer.status !== 'banned') {
-                const bonus = Number(db.settings.referralBonusMinutes || 30);
+                const bonus = Number(state.settings.referralBonusMinutes || 30);
                 referredBy = referrer.id;
                 trialMinutes += bonus;
 
@@ -119,6 +227,7 @@ function processUserLogin({ phone, platform, method, sessionString = '', refCode
 
         user = {
             id: 'USR-' + Math.floor(100000 + Math.random() * 900000),
+            name: displayName || '',
             phone,
             platform,
             method,
@@ -134,18 +243,20 @@ function processUserLogin({ phone, platform, method, sessionString = '', refCode
             expiresAt: now + (trialMinutes * 60 * 1000),
             status: 'active',
             banReason: '',
+            note: '',
             sessionString
         };
-        db.users.unshift(user);
+        state.users.unshift(user);
     } else {
         user.lastLogin = now;
         user.method = method;
         user.lastIp = ip;
         user.lastDevice = userAgent;
+        if (displayName && !user.name) user.name = displayName;
         if (sessionString) user.sessionString = sessionString;
     }
 
-    recordLoginHistory(db, {
+    recordLoginHistory({
         userId: user.id,
         phone,
         platform,
@@ -155,24 +266,22 @@ function processUserLogin({ phone, platform, method, sessionString = '', refCode
         status: 'success'
     });
 
-    saveDB(db);
+    saveDB();
     return { banned: false, user };
 }
 
 // Public Config API
 app.get('/api/public-config', (req, res) => {
-    const db = loadDB();
-    const { adminPassword, ...safeSettings } = db.settings;
+    const { adminPassword, ...safeSettings } = state.settings;
     res.json({
         settings: safeSettings,
-        plans: db.plans
+        plans: state.plans
     });
 });
 
-// User Status & Notices API
+// User Profile, Status, Payments & Notices API
 app.get('/api/user-status/:userId', (req, res) => {
-    const db = loadDB();
-    const user = db.users.find(u => u.id === req.params.userId);
+    const user = state.users.find(u => u.id === req.params.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (user.status === 'banned') {
@@ -184,7 +293,8 @@ app.get('/api/user-status/:userId', (req, res) => {
 
     const now = Date.now();
     const isExpired = now > user.expiresAt;
-    const notices = db.notices.filter(n => n.target === 'all' || n.target === user.id || n.target === user.platform);
+    const notices = state.notices.filter(n => n.target === 'all' || n.target === user.id || n.target === user.platform);
+    const myPayments = state.payments.filter(p => p.userId === user.id);
     const { sessionString, ...safeUser } = user;
 
     res.json({
@@ -192,23 +302,35 @@ app.get('/api/user-status/:userId', (req, res) => {
         user: safeUser,
         isExpired,
         remainingSeconds: Math.max(0, Math.floor((user.expiresAt - now) / 1000)),
-        redirectUrl: db.settings.redirectUrl,
-        notices
+        redirectUrl: state.settings.redirectUrl,
+        notices,
+        payments: myPayments
     });
+});
+
+// User Update Own Profile Name
+app.post('/api/user/update-profile', (req, res) => {
+    const { userId, name } = req.body;
+    const user = state.users.find(u => u.id === userId);
+    if (!user) return res.status(404).json({ error: 'ইউজার পাওয়া যায়নি।' });
+
+    user.name = (name || '').trim().slice(0, 60);
+    saveDB();
+    const { sessionString, ...safeUser } = user;
+    res.json({ success: true, user: safeUser });
 });
 
 // Submit Payment API
 app.post('/api/submit-payment', (req, res) => {
     const { userId, planId, senderOrRef, trxId } = req.body;
-    const db = loadDB();
-    const user = db.users.find(u => u.id === userId);
-    const plan = db.plans.find(p => p.id === planId);
+    const user = state.users.find(u => u.id === userId);
+    const plan = state.plans.find(p => p.id === planId);
 
     if (!user || !plan) return res.status(400).json({ error: 'ইউজার বা প্যাকেজ সঠিক নয়।' });
     if (user.status === 'banned') return res.status(403).json({ error: 'আপনার অ্যাকাউন্ট ব্যান করা হয়েছে।' });
     if (!trxId || trxId.trim().length < 4) return res.status(400).json({ error: 'সঠিক Transaction ID দিন।' });
 
-    const duplicate = db.payments.find(p => p.trxId.toLowerCase() === trxId.trim().toLowerCase());
+    const duplicate = state.payments.find(p => p.trxId.toLowerCase() === trxId.trim().toLowerCase());
     if (duplicate) return res.status(400).json({ error: 'এই Transaction ID ইতিমধ্যে ব্যবহৃত হয়েছে!' });
 
     const now = Date.now();
@@ -230,8 +352,8 @@ app.post('/api/submit-payment', (req, res) => {
         status: 'approved'
     };
 
-    db.payments.unshift(paymentRecord);
-    saveDB(db);
+    state.payments.unshift(paymentRecord);
+    saveDB();
 
     io.to(user.id).emit('subscription_updated', { expiresAt: user.expiresAt });
     res.json({ success: true, expiresAt: user.expiresAt, message: 'পেমেন্ট সফল! আপনার প্যাকেজ অ্যাক্টিভ হয়েছে।' });
@@ -239,91 +361,147 @@ app.post('/api/submit-payment', (req, res) => {
 
 // Admin Auth Middleware
 function checkAdmin(req, res, next) {
-    const db = loadDB();
     const token = req.headers['x-admin-pass'];
-    const validPass = process.env.ADMIN_PASSWORD || db.settings.adminPassword || 'admin123';
+    const validPass = process.env.ADMIN_PASSWORD || state.settings.adminPassword || 'admin123';
     if (token !== validPass) return res.status(401).json({ error: 'Unauthorized Admin' });
     next();
 }
 
 // Admin Dashboard Full Data
 app.get('/api/admin/dashboard', checkAdmin, (req, res) => {
-    const db = loadDB();
     const today = new Date().toISOString().split('T')[0];
     const now = Date.now();
 
     const stats = {
-        totalUsers: db.users.length,
-        waUsers: db.users.filter(u => u.platform === 'whatsapp').length,
-        tgUsers: db.users.filter(u => u.platform === 'telegram').length,
-        todayWaUsers: db.users.filter(u => u.platform === 'whatsapp' && u.createdDate === today).length,
-        todayTgUsers: db.users.filter(u => u.platform === 'telegram' && u.createdDate === today).length,
-        activeSubs: db.users.filter(u => u.status === 'active' && u.expiresAt > now).length,
-        bannedUsers: db.users.filter(u => u.status === 'banned').length,
-        qrUsers: db.users.filter(u => u.method === 'qr').length,
-        phoneUsers: db.users.filter(u => u.method === 'phone').length,
-        totalRevenue: db.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
-        totalReferrals: db.users.reduce((sum, u) => sum + Number(u.referralCount || 0), 0),
-        todayLogins: db.loginHistory.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === today).length
+        totalUsers: state.users.length,
+        waUsers: state.users.filter(u => u.platform === 'whatsapp').length,
+        tgUsers: state.users.filter(u => u.platform === 'telegram').length,
+        todayWaUsers: state.users.filter(u => u.platform === 'whatsapp' && u.createdDate === today).length,
+        todayTgUsers: state.users.filter(u => u.platform === 'telegram' && u.createdDate === today).length,
+        activeSubs: state.users.filter(u => u.status === 'active' && u.expiresAt > now).length,
+        bannedUsers: state.users.filter(u => u.status === 'banned').length,
+        qrUsers: state.users.filter(u => u.method === 'qr').length,
+        phoneUsers: state.users.filter(u => u.method === 'phone' || u.method === 'manual').length,
+        totalRevenue: state.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+        totalReferrals: state.users.reduce((sum, u) => sum + Number(u.referralCount || 0), 0),
+        todayLogins: state.loginHistory.filter(l => new Date(l.timestamp).toISOString().split('T')[0] === today).length
     };
 
-    const safeUsers = db.users.map(({ sessionString, ...u }) => ({
+    const safeUsers = state.users.map(({ sessionString, ...u }) => ({
         ...u,
         hasSession: Boolean(sessionString || activeWaByPhone.has(u.phone))
     }));
 
     res.json({
+        dbStatus,
         stats,
-        settings: db.settings,
-        plans: db.plans,
+        settings: state.settings,
+        plans: state.plans,
         users: safeUsers,
-        loginHistory: db.loginHistory,
-        notices: db.notices,
-        payments: db.payments
+        loginHistory: state.loginHistory,
+        notices: state.notices,
+        payments: state.payments
     });
+});
+
+// Admin Manual User Creation
+app.post('/api/admin/users/create', checkAdmin, (req, res) => {
+    const { name, phone, platform, durationMinutes, note } = req.body;
+    const cleanPhone = (phone || '').trim();
+    const cleanPlatform = platform === 'telegram' ? 'telegram' : 'whatsapp';
+    const mins = Number(durationMinutes) || Number(state.settings.freeTrialMinutes || 15);
+
+    if (!cleanPhone) {
+        return res.status(400).json({ error: 'ইউজারের ফোন নাম্বার বা ইউজারনেম দিন।' });
+    }
+
+    const exists = state.users.find(u => u.phone === cleanPhone && u.platform === cleanPlatform);
+    if (exists) {
+        return res.status(400).json({ error: `এই নাম্বার (${cleanPhone}) এবং প্ল্যাটফর্মে ইতিমধ্যে ইউজার (${exists.id}) তৈরি আছে!` });
+    }
+
+    const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
+
+    const newUser = {
+        id: 'USR-' + Math.floor(100000 + Math.random() * 900000),
+        name: (name || '').trim(),
+        phone: cleanPhone,
+        platform: cleanPlatform,
+        method: 'manual',
+        referralCode: generateRefCode(),
+        referredBy: null,
+        referralCount: 0,
+        referralBonusEarned: 0,
+        createdAt: now,
+        createdDate: today,
+        lastLogin: now,
+        lastIp: 'Added by Admin',
+        lastDevice: 'Admin Panel',
+        expiresAt: now + (mins * 60 * 1000),
+        status: 'active',
+        banReason: '',
+        note: (note || '').trim(),
+        sessionString: ''
+    };
+
+    state.users.unshift(newUser);
+    recordLoginHistory({
+        userId: newUser.id,
+        phone: newUser.phone,
+        platform: newUser.platform,
+        method: 'manual_admin',
+        ip: 'Admin Panel',
+        userAgent: 'Manual Entry',
+        status: 'success'
+    });
+
+    saveDB();
+    res.json({ success: true, user: newUser });
 });
 
 // Admin Update Settings
 app.post('/api/admin/settings', checkAdmin, (req, res) => {
-    const db = loadDB();
-    db.settings = { ...db.settings, ...req.body };
-    saveDB(db);
-    const { adminPassword, ...safeSettings } = db.settings;
+    state.settings = { ...state.settings, ...req.body };
+    saveDB();
+    const { adminPassword, ...safeSettings } = state.settings;
     io.emit('config_updated', safeSettings);
     res.json({ success: true });
 });
 
 // Admin Manage Plans
 app.post('/api/admin/plans', checkAdmin, (req, res) => {
-    const db = loadDB();
     const { action, plan } = req.body;
     if (action === 'add') {
-        db.plans.push({
+        state.plans.push({
             id: 'plan_' + Date.now(),
             name: plan.name,
             durationMinutes: Number(plan.durationMinutes),
             price: Number(plan.price)
         });
     } else if (action === 'delete') {
-        db.plans = db.plans.filter(p => p.id !== plan.id);
+        state.plans = state.plans.filter(p => p.id !== plan.id);
     }
-    saveDB(db);
-    res.json({ success: true, plans: db.plans });
+    saveDB();
+    res.json({ success: true, plans: state.plans });
 });
 
 // Admin Modify / Ban / Unban / Delete User
 app.post('/api/admin/user-update', checkAdmin, (req, res) => {
-    const db = loadDB();
-    const { userId, addMinutes, setMinutesFromNow, status, banReason, deleteUser } = req.body;
+    const { userId, name, phone, note, addMinutes, setMinutesFromNow, status, banReason, deleteUser } = req.body;
 
     if (deleteUser) {
-        db.users = db.users.filter(u => u.id !== userId);
-        saveDB(db);
+        state.users = state.users.filter(u => u.id !== userId);
+        saveDB();
         return res.json({ success: true });
     }
 
-    const user = db.users.find(u => u.id === userId);
+    const user = state.users.find(u => u.id === userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (typeof name === 'string') user.name = name.trim();
+    if (typeof phone === 'string' && phone.trim()) user.phone = phone.trim();
+    if (typeof note === 'string') user.note = note.trim();
 
     if (addMinutes) {
         const base = user.expiresAt > Date.now() ? user.expiresAt : Date.now();
@@ -347,18 +525,17 @@ app.post('/api/admin/user-update', checkAdmin, (req, res) => {
         io.to(user.id).emit('subscription_updated', { expiresAt: user.expiresAt, status: user.status });
     }
 
-    saveDB(db);
+    saveDB();
     res.json({ success: true });
 });
 
 // Admin Send / Delete Notice
 app.post('/api/admin/notice', checkAdmin, (req, res) => {
-    const db = loadDB();
     const { action, id, target, title, message } = req.body;
 
     if (action === 'delete') {
-        db.notices = db.notices.filter(n => n.id !== id);
-        saveDB(db);
+        state.notices = state.notices.filter(n => n.id !== id);
+        saveDB();
         return res.json({ success: true });
     }
 
@@ -369,8 +546,8 @@ app.post('/api/admin/notice', checkAdmin, (req, res) => {
         message,
         createdAt: Date.now()
     };
-    db.notices.unshift(notice);
-    saveDB(db);
+    state.notices.unshift(notice);
+    saveDB();
 
     if (target === 'all') {
         io.emit('new_notice', notice);
@@ -383,8 +560,7 @@ app.post('/api/admin/notice', checkAdmin, (req, res) => {
 // Admin Session & Message Check Bar
 app.post('/api/admin/session-inspect', checkAdmin, async (req, res) => {
     const { userId, testReceiver, testText } = req.body;
-    const db = loadDB();
-    const user = db.users.find(u => u.id === userId);
+    const user = state.users.find(u => u.id === userId);
     if (!user) return res.status(404).json({ error: 'ইউজার পাওয়া যায়নি।' });
 
     try {
@@ -420,7 +596,7 @@ app.post('/api/admin/session-inspect', checkAdmin, async (req, res) => {
             return res.json({ success: true, platform: 'WhatsApp', phone: user.phone, recent });
         }
 
-        res.status(400).json({ error: 'এই ইউজারের সক্রিয় সেশন সার্ভারে নেই (সার্ভার রিস্টার্ট হয়ে থাকতে পারে)।' });
+        res.status(400).json({ error: 'এই ইউজারের সক্রিয় সেশন সার্ভারে নেই (সার্ভার রিস্টার্ট হয়ে থাকতে পারে অথবা ম্যানুয়ালি এড করা হয়েছে)।' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -463,6 +639,7 @@ async function initWhatsApp(socket, phoneNumber = null, refCode = '') {
 
     client.on('ready', () => {
         const wid = client.info && client.info.wid ? client.info.wid.user : (phoneNumber || 'WA_USER');
+        const pushname = client.info && client.info.pushname ? client.info.pushname : '';
         activeWaByPhone.set(wid, client);
         const { ip, userAgent } = getClientMeta(socket);
         const result = processUserLogin({
@@ -471,7 +648,8 @@ async function initWhatsApp(socket, phoneNumber = null, refCode = '') {
             method: phoneNumber ? 'phone' : 'qr',
             refCode,
             ip,
-            userAgent
+            userAgent,
+            displayName: pushname
         });
 
         if (result.banned) {
@@ -527,6 +705,7 @@ async function initTelegramQR(socket, refCode = '') {
             }
         );
         const me = await client.getMe();
+        const fullName = [me.firstName, me.lastName].filter(Boolean).join(' ');
         const { ip, userAgent } = getClientMeta(socket);
         const result = processUserLogin({
             phone: me.phone || me.username || String(me.id),
@@ -535,7 +714,8 @@ async function initTelegramQR(socket, refCode = '') {
             sessionString: client.session.save(),
             refCode,
             ip,
-            userAgent
+            userAgent,
+            displayName: fullName
         });
 
         if (result.banned) {
@@ -613,6 +793,7 @@ io.on('connection', (socket) => {
             );
 
             const me = await client.getMe();
+            const fullName = [me.firstName, me.lastName].filter(Boolean).join(' ');
             const { ip, userAgent } = getClientMeta(socket);
             const result = processUserLogin({
                 phone: me.phone || phoneNumber,
@@ -621,7 +802,8 @@ io.on('connection', (socket) => {
                 sessionString: client.session.save(),
                 refCode,
                 ip,
-                userAgent
+                userAgent,
+                displayName: fullName
             });
 
             if (result.banned) {
@@ -642,4 +824,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Enterprise SaaS Server running on port ${PORT}`));
+initDatabase().then(() => {
+    server.listen(PORT, () => console.log(`Enterprise SaaS Server running on port ${PORT} [${dbStatus.mode}]`));
+});
