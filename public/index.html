@@ -3,242 +3,366 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - WhatsApp & Telegram</title>
+    <title>User Portal - Login & Subscription</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
         body {
-            background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe');
+            margin: 0;
+            min-height: 100vh;
             background-size: cover;
             background-position: center;
-            min-height: 100vh;
-            margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 16px;
-            font-family: Arial, sans-serif;
+            padding: 15px;
         }
         .card {
             width: 100%;
-            max-width: 420px;
-            background: rgba(255, 255, 255, 0.92);
-            border-radius: 16px;
+            max-width: 430px;
+            background: rgba(255, 255, 255, 0.94);
+            border-radius: 18px;
             padding: 24px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
-            backdrop-filter: blur(6px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
             text-align: center;
         }
-        .platform-tabs, .mode-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
+        .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
         .tab-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            background: #e5e7eb;
-            color: #111827;
+            flex: 1; padding: 10px; border: none; border-radius: 10px;
+            font-weight: bold; cursor: pointer; background: #e2e8f0; color: #1e293b;
         }
         .tab-btn.active.wa { background: #16a34a; color: #fff; }
         .tab-btn.active.tg { background: #0284c7; color: #fff; }
-        .tab-btn.active.mode { background: #1f2937; color: #fff; }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 10px;
-            border: 1px solid #cbd5e1;
-            font-size: 15px;
+        .tab-btn.active.mode { background: #0f172a; color: #fff; }
+        input, select {
+            width: 100%; padding: 12px; margin: 8px 0;
+            border: 1px solid #cbd5e1; border-radius: 10px; font-size: 15px;
         }
-        .action-btn {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            background: #2563eb;
-            color: #fff;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 8px;
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 10px;
+            background: #2563eb; color: #fff; font-weight: bold; font-size: 15px;
+            cursor: pointer; margin-top: 8px;
         }
-        .save-btn {
-            background: #0f766e;
-            margin-top: 10px;
-        }
-        #qr-img {
-            width: 230px;
-            height: 230px;
-            margin: 12px auto;
-            display: none;
-            border-radius: 10px;
-            background: #fff;
-            padding: 8px;
-        }
+        .btn-green { background: #059669; }
+        .hidden { display: none !important; }
+        #qr-img { width: 220px; height: 220px; margin: 12px auto; border-radius: 10px; background: #fff; padding: 6px; }
         .code-box {
-            font-size: 24px;
-            font-weight: bold;
-            letter-spacing: 4px;
-            background: #f1f5f9;
-            padding: 12px;
-            border-radius: 10px;
-            margin: 12px 0;
-            display: none;
+            font-size: 22px; font-weight: bold; letter-spacing: 3px;
+            background: #f1f5f9; padding: 12px; border-radius: 10px; margin: 10px 0;
         }
-        .status-msg {
-            margin-top: 10px;
-            font-size: 13px;
-            color: #334155;
-            min-height: 20px;
+        .status { margin-top: 10px; font-size: 13px; color: #b91c1c; font-weight: 500; }
+
+        /* App Workspace */
+        #app-view {
+            position: fixed; inset: 0; background: #0f172a; display: flex; flex-direction: column;
         }
-        .hidden { display: none; }
+        .topbar {
+            background: #1e293b; color: #fff; padding: 8px 14px;
+            display: flex; justify-content: space-between; align-items: center; font-size: 13px;
+        }
+        .badge { background: #f59e0b; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+        iframe { flex: 1; width: 100%; border: none; background: #fff; }
+
+        /* Notice Banner */
+        .notice-bar {
+            background: #fef08a; color: #854d0e; padding: 8px 12px; font-size: 13px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* Paywall Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.92);
+            display: flex; justify-content: center; align-items: center; padding: 16px; z-index: 999;
+        }
+        .plan-item {
+            border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px; margin: 8px 0;
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+        }
+        .plan-item.selected { border: 2px solid #2563eb; background: #eff6ff; }
     </style>
 </head>
 <body>
-    <div class="card" id="login-card">
+
+    <!-- Login Card -->
+    <div class="card" id="login-view">
         <h2 style="margin-top:0;">অ্যাকাউন্ট লগ-ইন</h2>
 
-        <div class="platform-tabs">
-            <button type="button" class="tab-btn active wa" id="btn-wa" onclick="selectPlatform('whatsapp')">WhatsApp</button>
-            <button type="button" class="tab-btn tg" id="btn-tg" onclick="selectPlatform('telegram')">Telegram</button>
+        <div class="tabs">
+            <button class="tab-btn active wa" id="tab-wa" onclick="setPlatform('whatsapp')">WhatsApp</button>
+            <button class="tab-btn tg" id="tab-tg" onclick="setPlatform('telegram')">Telegram</button>
         </div>
 
-        <div class="mode-tabs">
-            <button type="button" class="tab-btn active mode" id="btn-phone-mode" onclick="selectMode('phone')">নাম্বার দিয়ে লগ-ইন</button>
-            <button type="button" class="tab-btn mode" id="btn-qr-mode" onclick="selectMode('qr')">QR Code দিয়ে লগ-ইন</button>
+        <div class="tabs">
+            <button class="tab-btn active mode" id="tab-phone" onclick="setMode('phone')">নাম্বার দিয়ে</button>
+            <button class="tab-btn mode" id="tab-qr" onclick="setMode('qr')">QR Code দিয়ে</button>
         </div>
 
-        <div id="phone-section">
-            <input type="text" id="phone-input" placeholder="ফোন নাম্বার লিখুন (যেমন: +88017xxxxxxxx)">
-            <button type="button" class="action-btn" onclick="submitPhone()">কোড পাঠান / লগ-ইন করুন</button>
+        <div id="phone-box">
+            <input type="text" id="phone-input" placeholder="ফোন নাম্বার (+8801XXXXXXXXX)">
+            <button class="btn" onclick="sendPhone()">কোড পাঠান</button>
 
-            <div id="tg-otp-box" class="hidden">
-                <input type="text" id="tg-code-input" placeholder="Telegram-এ আসা কোড লিখুন">
-                <input type="password" id="tg-2fa-input" placeholder="2FA Password থাকলে লিখুন (ঐচ্ছিক)">
-                <button type="button" class="action-btn" onclick="verifyTelegramCode()">কোড ভেরিফাই করুন</button>
+            <div id="tg-verify-box" class="hidden">
+                <input type="text" id="tg-otp" placeholder="Telegram OTP কোড লিখুন">
+                <input type="password" id="tg-2fa" placeholder="2FA পাসওয়ার্ড (যদি চালু থাকে)">
+                <button class="btn btn-green" onclick="verifyTg()">ভেরিফাই ও লগ-ইন</button>
             </div>
 
-            <div class="code-box" id="wa-pairing-box"></div>
+            <div id="wa-pair-code" class="code-box hidden"></div>
         </div>
 
-        <div id="qr-section" class="hidden">
-            <button type="button" class="action-btn" onclick="requestQR()">QR Code তৈরি করুন</button>
-            <img id="qr-img" src="" alt="QR Code">
-            <button type="button" class="action-btn save-btn hidden" id="save-qr-btn" onclick="downloadQR()">QR Code সেভ / ডাউনলোড করুন</button>
+        <div id="qr-box" class="hidden">
+            <button class="btn" onclick="generateQR()">QR Code তৈরি করুন</button>
+            <img id="qr-img" class="hidden" src="" alt="QR">
+            <button class="btn btn-green hidden" id="dl-qr-btn" onclick="downloadImage(currentQr, currentPlatform + '-qr.png')">QR Code সেভ / ডাউনলোড করুন</button>
         </div>
 
-        <div class="status-msg" id="status-msg"></div>
+        <div class="status" id="login-status"></div>
+    </div>
+
+    <!-- Main App Content View -->
+    <div id="app-view" class="hidden">
+        <div class="topbar">
+            <span>ID: <b id="topbar-uid"></b></span>
+            <span class="badge">সময় বাকি: <span id="timer-text">--:--</span></span>
+            <div>
+                <button onclick="openPaywall()" style="padding:4px 8px; border-radius:6px; border:none; background:#22c55e; color:#fff; cursor:pointer;">প্যাকেজ কিনুন</button>
+                <button onclick="logoutUser()" style="padding:4px 8px; border-radius:6px; border:none; background:#ef4444; color:#fff; cursor:pointer;">লগ-আউট</button>
+            </div>
+        </div>
+        <div id="notice-area" class="notice-bar hidden">
+            <span id="notice-text"></span>
+            <button onclick="this.parentElement.classList.add('hidden')" style="border:none;background:none;font-weight:bold;cursor:pointer;">✕</button>
+        </div>
+        <iframe id="content-frame" src=""></iframe>
+    </div>
+
+    <!-- Subscription Paywall Modal -->
+    <div id="paywall-modal" class="modal-overlay hidden">
+        <div class="card" style="max-height:92vh; overflow-y:auto;">
+            <h3 style="margin-top:0; color:#dc2626;">ফ্রি সময় শেষ / সাবস্ক্রিপশন প্রয়োজন</h3>
+            <p style="font-size:13px; color:#475569;">অ্যাপটি ব্যবহার চালিয়ে যেতে নিচের যেকোনো একটি প্যাকেজ সিলেক্ট করে পেমেন্ট করুন:</p>
+
+            <div id="plans-list"></div>
+
+            <div style="background:#f8fafc; padding:12px; border-radius:10px; margin:10px 0; border:1px dashed #94a3b8;">
+                <div style="font-size:14px;">পেমেন্ট নাম্বার (bKash/Nagad/Rocket):</div>
+                <div style="font-size:20px; font-weight:bold; color:#0f172a;" id="pay-number"></div>
+                <div id="bangla-qr-wrap" class="hidden" style="margin-top:8px;">
+                    <img id="bangla-qr-img" src="" style="width:160px; height:160px; border-radius:8px;">
+                    <br>
+                    <button class="btn btn-green" style="width:auto; padding:6px 12px; font-size:13px;" onclick="downloadImage(appConfig.settings.banglaQrImage, 'bangla-payment-qr.png')">বাংলা QR ডাউনলোড করুন</button>
+                </div>
+            </div>
+
+            <input type="text" id="pay-ref" placeholder="যে নাম্বার থেকে পাঠিয়েছেন / রেফারেন্স">
+            <input type="text" id="pay-trx" placeholder="Transaction ID (TrxID) লিখুন">
+            <button class="btn btn-green" onclick="submitPayment()">পেমেন্ট ভেরিফাই ও চালু করুন</button>
+            <div class="status" id="pay-status"></div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let appConfig = { settings: {}, plans: [] };
         let currentPlatform = 'whatsapp';
         let currentMode = 'phone';
-        let currentQrDataUrl = '';
-        let tgPhoneData = { phoneNumber: '', phoneCodeHash: '' };
+        let currentQr = '';
+        let activeUser = null;
+        let selectedPlanId = '';
+        let countdownInterval = null;
 
-        function setStatus(text) {
-            document.getElementById('status-msg').innerText = text;
-        }
+        async function initApp() {
+            const res = await fetch('/api/public-config');
+            appConfig = await res.json();
+            document.body.style.backgroundImage = `url('${appConfig.settings.bgImage}')`;
+            document.getElementById('pay-number').innerText = appConfig.settings.paymentNumber || 'N/A';
 
-        function selectPlatform(platform) {
-            currentPlatform = platform;
-            document.getElementById('btn-wa').classList.toggle('active', platform === 'whatsapp');
-            document.getElementById('btn-tg').classList.toggle('active', platform === 'telegram');
-            document.getElementById('tg-otp-box').classList.add('hidden');
-            document.getElementById('wa-pairing-box').style.display = 'none';
-            setStatus(`${platform === 'whatsapp' ? 'WhatsApp' : 'Telegram'} সিলেক্ট করা হয়েছে।`);
-        }
-
-        function selectMode(mode) {
-            currentMode = mode;
-            document.getElementById('btn-phone-mode').classList.toggle('active', mode === 'phone');
-            document.getElementById('btn-qr-mode').classList.toggle('active', mode === 'qr');
-            document.getElementById('phone-section').classList.toggle('hidden', mode !== 'phone');
-            document.getElementById('qr-section').classList.toggle('hidden', mode !== 'qr');
-            setStatus('');
-        }
-
-        function submitPhone() {
-            const phone = document.getElementById('phone-input').value.trim();
-            if (!phone) {
-                setStatus('দয়া করে সঠিক ফোন নাম্বার লিখুন।');
-                return;
+            if (appConfig.settings.banglaQrImage) {
+                document.getElementById('bangla-qr-wrap').classList.remove('hidden');
+                document.getElementById('bangla-qr-img').src = appConfig.settings.banglaQrImage;
             }
-            setStatus('রিকোয়েস্ট পাঠানো হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...');
-            socket.emit('start_phone_login', { platform: currentPlatform, phone });
+
+            if (!appConfig.settings.enableWhatsApp) document.getElementById('tab-wa').classList.add('hidden');
+            if (!appConfig.settings.enableTelegram) document.getElementById('tab-tg').classList.add('hidden');
+
+            renderPlans();
+
+            const savedUserId = localStorage.getItem('saas_user_id');
+            if (savedUserId) {
+                await loadUserSession(savedUserId);
+            }
         }
 
-        function verifyTelegramCode() {
-            const code = document.getElementById('tg-code-input').value.trim();
-            const password = document.getElementById('tg-2fa-input').value;
-            if (!code) {
-                setStatus('ভেরিফিকেশন কোড লিখুন।');
-                return;
-            }
-            setStatus('কোড যাচাই করা হচ্ছে...');
-            socket.emit('verify_tg_code', {
-                phoneNumber: tgPhoneData.phoneNumber,
-                phoneCodeHash: tgPhoneData.phoneCodeHash,
-                code,
-                password
+        function renderPlans() {
+            const box = document.getElementById('plans-list');
+            box.innerHTML = '';
+            appConfig.plans.forEach((p, idx) => {
+                if (idx === 0) selectedPlanId = p.id;
+                const div = document.createElement('div');
+                div.className = 'plan-item' + (idx === 0 ? ' selected' : '');
+                div.innerHTML = `<span><b>${p.name}</b></span><span style="color:#16a34a;font-weight:bold;">৳ ${p.price}</span>`;
+                div.onclick = () => {
+                    document.querySelectorAll('.plan-item').forEach(el => el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    selectedPlanId = p.id;
+                };
+                box.appendChild(div);
             });
         }
 
-        function requestQR() {
-            setStatus('QR Code জেনারেট হচ্ছে...');
-            document.getElementById('save-qr-btn').classList.add('hidden');
+        function setPlatform(p) {
+            currentPlatform = p;
+            document.getElementById('tab-wa').classList.toggle('active', p === 'whatsapp');
+            document.getElementById('tab-tg').classList.toggle('active', p === 'telegram');
+            document.getElementById('tg-verify-box').classList.add('hidden');
+            document.getElementById('wa-pair-code').classList.add('hidden');
+            document.getElementById('login-status').innerText = '';
+        }
+
+        function setMode(m) {
+            currentMode = m;
+            document.getElementById('tab-phone').classList.toggle('active', m === 'phone');
+            document.getElementById('tab-qr').classList.toggle('active', m === 'qr');
+            document.getElementById('phone-box').classList.toggle('hidden', m !== 'phone');
+            document.getElementById('qr-box').classList.toggle('hidden', m !== 'qr');
+        }
+
+        function sendPhone() {
+            const phone = document.getElementById('phone-input').value.trim();
+            if (!phone) return alert('ফোন নাম্বার লিখুন');
+            document.getElementById('login-status').innerText = 'অপেক্ষা করুন, কোড পাঠানো হচ্ছে...';
+            socket.emit('start_phone_login', { platform: currentPlatform, phone });
+        }
+
+        function verifyTg() {
+            const code = document.getElementById('tg-otp').value.trim();
+            const password = document.getElementById('tg-2fa').value;
+            if (!code) return alert('OTP কোড দিন');
+            document.getElementById('login-status').innerText = 'যাচাই করা হচ্ছে...';
+            socket.emit('verify_tg_code', { code, password });
+        }
+
+        function generateQR() {
+            document.getElementById('login-status').innerText = 'QR Code তৈরি হচ্ছে...';
             socket.emit('start_qr', { platform: currentPlatform });
         }
 
-        function downloadQR() {
-            if (!currentQrDataUrl) return;
-            const link = document.createElement('a');
-            link.href = currentQrDataUrl;
-            link.download = `${currentPlatform}-login-qr.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        function downloadImage(dataUrl, filename) {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
-        socket.on('qr_code', ({ platform, image }) => {
-            if (platform !== currentPlatform) return;
-            currentQrDataUrl = image;
+        async function loadUserSession(userId) {
+            const res = await fetch(`/api/user-status/${userId}`);
+            if (!res.ok) {
+                localStorage.removeItem('saas_user_id');
+                return;
+            }
+            const data = await res.json();
+            activeUser = data.user;
+            socket.emit('register_room', { userId: activeUser.id, platform: activeUser.platform });
+
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            document.getElementById('topbar-uid').innerText = activeUser.id;
+            document.getElementById('content-frame').src = data.redirectUrl;
+
+            if (data.notices && data.notices.length > 0) {
+                document.getElementById('notice-area').classList.remove('hidden');
+                document.getElementById('notice-text').innerText = `${data.notices[0].title}: ${data.notices[0].message}`;
+            }
+
+            startTimer(activeUser.expiresAt);
+        }
+
+        function startTimer(expiresAt) {
+            if (countdownInterval) clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                const diff = Math.floor((expiresAt - Date.now()) / 1000);
+                if (diff <= 0) {
+                    document.getElementById('timer-text').innerText = '00:00';
+                    openPaywall();
+                    clearInterval(countdownInterval);
+                } else {
+                    const mins = Math.floor(diff / 60);
+                    const secs = diff % 60;
+                    document.getElementById('timer-text').innerText = `${mins}m ${secs}s`;
+                    document.getElementById('paywall-modal').classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        function openPaywall() {
+            document.getElementById('paywall-modal').classList.remove('hidden');
+        }
+
+        async function submitPayment() {
+            const senderOrRef = document.getElementById('pay-ref').value.trim();
+            const trxId = document.getElementById('pay-trx').value.trim();
+            const res = await fetch('/api/submit-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: activeUser.id, planId: selectedPlanId, senderOrRef, trxId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('pay-status').style.color = 'green';
+                document.getElementById('pay-status').innerText = data.message;
+                startTimer(data.expiresAt);
+            } else {
+                document.getElementById('pay-status').innerText = data.error;
+            }
+        }
+
+        function logoutUser() {
+            localStorage.removeItem('saas_user_id');
+            location.reload();
+        }
+
+        socket.on('qr_code', ({ image }) => {
+            currentQr = image;
             const img = document.getElementById('qr-img');
             img.src = image;
-            img.style.display = 'block';
-            document.getElementById('save-qr-btn').classList.remove('hidden');
-            setStatus('QR Code তৈরি হয়েছে। স্ক্যান করুন বা নিচের বাটন থেকে সেভ করুন।');
+            img.classList.remove('hidden');
+            document.getElementById('dl-qr-btn').classList.remove('hidden');
+            document.getElementById('login-status').innerText = 'QR স্ক্যান করুন অথবা সেভ বাটনে ক্লিক করে ডাউনলোড করুন।';
         });
 
-        socket.on('pairing_code', ({ platform, code }) => {
-            if (platform === 'whatsapp') {
-                const box = document.getElementById('wa-pairing-box');
-                box.style.display = 'block';
-                box.innerText = code;
-                setStatus('WhatsApp এর Linked Devices -> Link with phone number এ এই কোডটি দিন।');
-            }
+        socket.on('pairing_code', ({ code }) => {
+            const box = document.getElementById('wa-pair-code');
+            box.innerText = code;
+            box.classList.remove('hidden');
+            document.getElementById('login-status').innerText = 'WhatsApp Linked Devices -> Link with phone number এ কোডটি দিন।';
         });
 
-        socket.on('tg_code_sent', ({ phoneCodeHash, phoneNumber }) => {
-            tgPhoneData = { phoneCodeHash, phoneNumber };
-            document.getElementById('tg-otp-box').classList.remove('hidden');
-            setStatus('আপনার Telegram অ্যাকাউন্টে কোড পাঠানো হয়েছে। নিচে কোডটি লিখুন।');
+        socket.on('tg_code_sent', () => {
+            document.getElementById('tg-verify-box').classList.remove('hidden');
+            document.getElementById('login-status').innerText = 'Telegram এ পাঠানো কোড ও 2FA পাসওয়ার্ড (থাকলে) দিন।';
         });
 
-        socket.on('authenticated', ({ url }) => {
-            setStatus('লগ-ইন সফল হয়েছে! কন্টেন্ট লোড হচ্ছে...');
-            document.body.innerHTML = `<iframe src="${url}" style="width:100%; height:100vh; border:none; margin:0; padding:0;"></iframe>`;
+        socket.on('authenticated', ({ user }) => {
+            localStorage.setItem('saas_user_id', user.id);
+            loadUserSession(user.id);
         });
 
         socket.on('auth_error', ({ message }) => {
-            setStatus(`ত্রুটি: ${message}`);
+            document.getElementById('login-status').innerText = 'ত্রুটি: ' + message;
         });
+
+        socket.on('new_notice', (notice) => {
+            document.getElementById('notice-area').classList.remove('hidden');
+            document.getElementById('notice-text').innerText = `${notice.title}: ${notice.message}`;
+        });
+
+        socket.on('subscription_updated', ({ expiresAt }) => {
+            if (expiresAt) startTimer(expiresAt);
+        });
+
+        initApp();
     </script>
 </body>
 </html>

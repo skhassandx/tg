@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Control Panel</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { margin: 0; background: #0f172a; color: #f8fafc; padding: 16px; }
+        .container { max-width: 1100px; margin: auto; }
+        .card { background: #1e293b; padding: 18px; border-radius: 14px; margin-bottom: 18px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+        .stat-box { background: #334155; padding: 14px; border-radius: 12px; text-align: center; }
+        .stat-box h2 { margin: 4px 0; color: #38bdf8; }
+        input, select, textarea {
+            width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px;
+            border: 1px solid #475569; background: #0f172a; color: #fff;
+        }
+        button {
+            padding: 10px 14px; border: none; border-radius: 8px; cursor: pointer;
+            background: #2563eb; color: #fff; font-weight: bold; margin-top: 6px;
+        }
+        .btn-green { background: #16a34a; }
+        .btn-red { background: #dc2626; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #334155; padding: 10px; text-align: left; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Admin Login -->
+    <div class="card" id="admin-login-box" style="max-width:400px; margin:80px auto;">
+        <h2>Admin Panel Login</h2>
+        <input type="password" id="admin-pass-input" placeholder="Admin Password (ডিফল্ট: admin123)">
+        <button onclick="loginAdmin()" style="width:100%;">প্রবেশ করুন</button>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>ডাইনামিক অ্যাডমিন কন্ট্রোল প্যানেল</h2>
+            <button class="btn-red" onclick="location.reload()">লগ-আউট</button>
+        </div>
+
+        <!-- Analytics -->
+        <div class="card">
+            <h3>লাইভ পরিসংখ্যান (Analytics)</h3>
+            <div class="grid" id="stats-grid"></div>
+        </div>
+
+        <!-- General & Payment Settings -->
+        <div class="card">
+            <h3>অ্যাপ ও পেমেন্ট সেটিংস</h3>
+            <label>লগ-ইন ব্যাকগ্রাউন্ড ইমেজ URL:</label>
+            <input type="text" id="set-bg">
+            <label>লগ-ইন সফল হলে Redirect URL:</label>
+            <input type="text" id="set-url">
+            <label>নতুন ইউজারের ফ্রি ট্রায়াল সময় (মিনিট):</label>
+            <input type="number" id="set-trial">
+            <label>পেমেন্ট রিসিভ নাম্বার (bKash/Nagad/Rocket):</label>
+            <input type="text" id="set-pay-num">
+            <label>বাংলা QR Code ছবি আপলোড করুন (পেমেন্টের জন্য):</label>
+            <input type="file" id="set-qr-file" accept="image/*" onchange="encodeQrFile(this)">
+            <div style="margin:8px 0;">
+                <label><input type="checkbox" id="set-en-wa" style="width:auto;"> WhatsApp লগ-ইন চালু</label>
+                &nbsp;&nbsp;
+                <label><input type="checkbox" id="set-en-tg" style="width:auto;"> Telegram লগ-ইন চালু</label>
+            </div>
+            <button class="btn-green" onclick="saveSettings()">সেটিংস সেভ করুন</button>
+        </div>
+
+        <!-- Subscription Plans -->
+        <div class="card">
+            <h3>সাবস্ক্রিপশন প্যাকেজ ম্যানেজমেন্ট</h3>
+            <div class="grid">
+                <input type="text" id="plan-name" placeholder="প্যাকেজের নাম (যেমন: ৭ দিন)">
+                <input type="number" id="plan-mins" placeholder="সময় (মিনিটে, যেমন: 10080)">
+                <input type="number" id="plan-price" placeholder="মূল্য (টাকায়)">
+                <button class="btn-green" onclick="addPlan()">নতুন প্যাকেজ যোগ করুন</button>
+            </div>
+            <table id="plans-table"></table>
+        </div>
+
+        <!-- Notice System -->
+        <div class="card">
+            <h3>নোটিশ পাঠান (সকলকে বা নির্দিষ্ট ইউজারকে)</h3>
+            <select id="notice-target">
+                <option value="all">সকল ইউজার (All Users)</option>
+                <option value="whatsapp">শুধুমাত্র WhatsApp ইউজার</option>
+                <option value="telegram">শুধুমাত্র Telegram ইউজার</option>
+            </select>
+            <input type="text" id="notice-title" placeholder="নোটিশের শিরোনাম">
+            <textarea id="notice-msg" rows="2" placeholder="বিস্তারিত নোটিশ লিখুন..."></textarea>
+            <button onclick="sendNotice()">নোটিশ পাঠান</button>
+        </div>
+
+        <!-- Users Table -->
+        <div class="card" style="overflow-x:auto;">
+            <h3>সকল ইউজার তালিকা ও কন্ট্রোল</h3>
+            <input type="text" id="user-search" placeholder="ফোন নাম্বার বা User ID দিয়ে খুঁজুন..." onkeyup="renderUsers()">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>ফোন/ইউজার</th>
+                        <th>প্ল্যাটফর্ম</th>
+                        <th>মেথড</th>
+                        <th>মেয়াদ শেষ</th>
+                        <th>অ্যাকশন</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- Session Inspector / Test Message -->
+        <div class="card">
+            <h3>সেশন মেসেজ ভিউ ও টেস্ট মেসেজ</h3>
+            <select id="inspect-user-select"></select>
+            <input type="text" id="test-receiver" placeholder="প্রাপকের নাম্বার বা ইউজারনেম (ঐচ্ছিক)">
+            <input type="text" id="test-msg-text" placeholder="টেস্ট মেসেজ লিখুন (ঐচ্ছিক)">
+            <button onclick="inspectSession()">মেসেজ দেখুন / টেস্ট মেসেজ পাঠান</button>
+            <pre id="inspect-output" style="background:#0f172a; padding:10px; border-radius:8px; margin-top:10px; white-space:pre-wrap;"></pre>
+        </div>
+
+        <!-- Payment History -->
+        <div class="card" style="overflow-x:auto;">
+            <h3>পেমেন্ট হিস্ট্রি</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>প্যাকেজ</th>
+                        <th>টাকা</th>
+                        <th>Ref / নাম্বার</th>
+                        <th>TrxID</th>
+                    </tr>
+                </thead>
+                <tbody id="payments-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let adminPass = '';
+    let dashboardData = {};
+    let uploadedQrBase64 = '';
+
+    async function loginAdmin() {
+        adminPass = document.getElementById('admin-pass-input').value;
+        const ok = await fetchDashboard();
+        if (ok) {
+            document.getElementById('admin-login-box').classList.add('hidden');
+            document.getElementById('admin-dashboard').classList.remove('hidden');
+        } else {
+            alert('ভুল অ্যাডমিন পাসওয়ার্ড!');
+        }
+    }
+
+    async function fetchDashboard() {
+        const res = await fetch('/api/admin/dashboard', {
+            headers: { 'x-admin-pass': adminPass }
+        });
+        if (!res.ok) return false;
+        dashboardData = await res.json();
+        renderAll();
+        return true;
+    }
+
+    function encodeQrFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => { uploadedQrBase64 = reader.result; };
+        reader.readAsDataURL(file);
+    }
+
+    function renderAll() {
+        const s = dashboardData.stats;
+        document.getElementById('stats-grid').innerHTML = `
+            <div class="stat-box"><div>মোট ইউজার</div><h2>${s.totalUsers}</h2></div>
+            <div class="stat-box"><div>WhatsApp মোট</div><h2>${s.waUsers}</h2></div>
+            <div class="stat-box"><div>Telegram মোট</div><h2>${s.tgUsers}</h2></div>
+            <div class="stat-box"><div>আজকে WhatsApp</div><h2>${s.todayWaUsers}</h2></div>
+            <div class="stat-box"><div>আজকে Telegram</div><h2>${s.todayTgUsers}</h2></div>
+            <div class="stat-box"><div>QR / নাম্বার</div><h2>${s.qrUsers} / ${s.phoneUsers}</h2></div>
+            <div class="stat-box"><div>মোট আয় (৳)</div><h2>${s.totalRevenue}</h2></div>
+        `;
+
+        const cfg = dashboardData.settings;
+        document.getElementById('set-bg').value = cfg.bgImage || '';
+        document.getElementById('set-url').value = cfg.redirectUrl || '';
+        document.getElementById('set-trial').value = cfg.freeTrialMinutes || 15;
+        document.getElementById('set-pay-num').value = cfg.paymentNumber || '';
+        document.getElementById('set-en-wa').checked = cfg.enableWhatsApp;
+        document.getElementById('set-en-tg').checked = cfg.enableTelegram;
+        uploadedQrBase64 = cfg.banglaQrImage || '';
+
+        const pTable = document.getElementById('plans-table');
+        pTable.innerHTML = '<tr><th>নাম</th><th>সময় (মিনিট)</th><th>মূল্য</th><th>অ্যাকশন</th></tr>';
+        dashboardData.plans.forEach(p => {
+            pTable.innerHTML += `<tr>
+                <td>${p.name}</td><td>${p.durationMinutes}</td><td>৳${p.price}</td>
+                <td><button class="btn-red" onclick="deletePlan('${p.id}')">মুছুন</button></td>
+            </tr>`;
+        });
+
+        const nSelect = document.getElementById('notice-target');
+        const iSelect = document.getElementById('inspect-user-select');
+        nSelect.innerHTML = `
+            <option value="all">সকল ইউজার (All Users)</option>
+            <option value="whatsapp">শুধুমাত্র WhatsApp ইউজার</option>
+            <option value="telegram">শুধুমাত্র Telegram ইউজার</option>
+        `;
+        iSelect.innerHTML = '';
+        dashboardData.users.forEach(u => {
+            nSelect.innerHTML += `<option value="${u.id}">${u.id} (${u.phone} - ${u.platform})</option>`;
+            iSelect.innerHTML += `<option value="${u.id}">${u.id} - ${u.phone} (${u.platform})</option>`;
+        });
+
+        renderUsers();
+
+        const payBody = document.getElementById('payments-tbody');
+        payBody.innerHTML = '';
+        dashboardData.payments.forEach(p => {
+            payBody.innerHTML += `<tr>
+                <td>${p.userId}</td><td>${p.planName}</td><td>৳${p.amount}</td>
+                <td>${p.senderOrRef}</td><td>${p.trxId}</td>
+            </tr>`;
+        });
+    }
+
+    function renderUsers() {
+        const q = document.getElementById('user-search').value.toLowerCase();
+        const tbody = document.getElementById('users-tbody');
+        tbody.innerHTML = '';
+        dashboardData.users
+            .filter(u => u.phone.toLowerCase().includes(q) || u.id.toLowerCase().includes(q))
+            .forEach(u => {
+                const exp = new Date(u.expiresAt).toLocaleString();
+                tbody.innerHTML += `<tr>
+                    <td>${u.id}</td>
+                    <td>${u.phone}</td>
+                    <td>${u.platform}</td>
+                    <td>${u.method}</td>
+                    <td>${exp} (${u.status})</td>
+                    <td>
+                        <button class="btn-green" onclick="modifyUser('${u.id}', 60)">+১ ঘণ্টা</button>
+                        <button onclick="modifyUser('${u.id}', 1440)">+১ দিন</button>
+                        <button class="btn-red" onclick="deleteUser('${u.id}')">ডিলিট</button>
+                    </td>
+                </tr>`;
+            });
+    }
+
+    async function saveSettings() {
+        await fetch('/api/admin/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({
+                bgImage: document.getElementById('set-bg').value,
+                redirectUrl: document.getElementById('set-url').value,
+                freeTrialMinutes: Number(document.getElementById('set-trial').value),
+                paymentNumber: document.getElementById('set-pay-num').value,
+                banglaQrImage: uploadedQrBase64,
+                enableWhatsApp: document.getElementById('set-en-wa').checked,
+                enableTelegram: document.getElementById('set-en-tg').checked
+            })
+        });
+        alert('সেটিংস আপডেট হয়েছে!');
+        fetchDashboard();
+    }
+
+    async function addPlan() {
+        await fetch('/api/admin/plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({
+                action: 'add',
+                plan: {
+                    name: document.getElementById('plan-name').value,
+                    durationMinutes: document.getElementById('plan-mins').value,
+                    price: document.getElementById('plan-price').value
+                }
+            })
+        });
+        fetchDashboard();
+    }
+
+    async function deletePlan(id) {
+        await fetch('/api/admin/plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({ action: 'delete', plan: { id } })
+        });
+        fetchDashboard();
+    }
+
+    async function modifyUser(userId, addMinutes) {
+        await fetch('/api/admin/user-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({ userId, addMinutes, status: 'active' })
+        });
+        fetchDashboard();
+    }
+
+    async function deleteUser(userId) {
+        if (!confirm('ইউজার মুছে ফেলবেন?')) return;
+        await fetch('/api/admin/user-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({ userId, deleteUser: true })
+        });
+        fetchDashboard();
+    }
+
+    async function sendNotice() {
+        await fetch('/api/admin/notice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({
+                target: document.getElementById('notice-target').value,
+                title: document.getElementById('notice-title').value,
+                message: document.getElementById('notice-msg').value
+            })
+        });
+        alert('নোটিশ পাঠানো হয়েছে!');
+    }
+
+    async function inspectSession() {
+        const res = await fetch('/api/admin/session-inspect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass },
+            body: JSON.stringify({
+                userId: document.getElementById('inspect-user-select').value,
+                testReceiver: document.getElementById('test-receiver').value,
+                testText: document.getElementById('test-msg-text').value
+            })
+        });
+        const data = await res.json();
+        document.getElementById('inspect-output').innerText = JSON.stringify(data, null, 2);
+    }
+</script>
+</body>
+</html>
