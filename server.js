@@ -23,21 +23,20 @@ const { NewMessage } = require('telegram/events');
 const app = express();
 const PORT = process.env.PORT || 10000;
 const PENDING_TIMEOUT_MS = 2 * 60 * 1000; // 2 Minutes Auto-Cleanup Timeout
-const MAX_MESSAGES_PER_USER = 40;
+const MAX_MESSAGES_PER_USER = 50;
 const CONCURRENCY_LIMIT = 4;
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ensure temp directory for Baileys auth files
 const WA_SESSIONS_DIR = path.join('/tmp', 'wa_sessions');
 if (!fs.existsSync(WA_SESSIONS_DIR)) {
   fs.mkdirSync(WA_SESSIONS_DIR, { recursive: true });
 }
 
 // ==========================================
-// 1. DATABASE SETUP (MongoDB Atlas + Fallback)
+// 1. DATABASE SCHEMAS (MongoDB Atlas + Local Fallback)
 // ==========================================
 let mongoConnected = false;
 let connectedDbName = 'nexus_saas';
@@ -51,7 +50,7 @@ const userSchema = new mongoose.Schema({
   status: { type: String, enum: ['active', 'banned'], default: 'active' },
   sessionStatus: { type: String, enum: ['connected', 'disconnected'], default: 'connected' },
   planName: { type: String, default: 'Free Trial' },
-  expiresAt: { type: Date, default: () => new Date(Date.now() + 3 * 86400000) },
+  expiresAt: { type: Date, default: () => new Date(Date.now() + 60 * 60000) },
   referralCode: { type: String, unique: true },
   referredBy: { type: String, default: '' },
   referralCount: { type: Number, default: 0 },
@@ -100,31 +99,86 @@ const loginHistorySchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 });
 
+const DEFAULT_SETTINGS = {
+  siteTitle: 'NexusPortal Pro',
+  siteSubtitle: 'নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল',
+  customLoginNote: '',
+  bgUrl: '',
+  postLoginRedirectUrl: '',
+  // Feature Master Switches
+  whatsappEnabled: true,
+  telegramEnabled: true,
+  loginMethodMode: 'both', // 'both' | 'phone_only' | 'qr_only'
+  referralEnabled: true,
+  freeTrialEnabled: true,
+  paymentEnabled: true,
+  termsEnabled: true,
+  noticeEnabled: true,
+  adsEnabled: true,
+  supportEnabled: false,
+  supportLabel: 'সাপোর্ট / যোগাযোগ',
+  supportUrl: 'https://t.me/',
+  // Time & Referral Settings (in Minutes)
+  freeTrialMinutes: 60,
+  referralBonusMinutes: 30,
+  referralNewUserBonusMinutes: 15,
+  // Payment Settings
+  paymentInstruction: 'নিচের যেকোনো নাম্বারে Send Money করে Transaction ID (TrxID) সাবমিট করুন।',
+  paymentNumbers: {
+    bkash: '01818896166',
+    bkashEnabled: true,
+    nagad: '01818896166',
+    nagadEnabled: true,
+    rocket: '01818896166',
+    rocketEnabled: true,
+    banglaQrUrl: '',
+    banglaQrEnabled: true
+  },
+  plans: [
+    { id: 'plan_1h', name: 'Express (১ ঘণ্টা / ৬০ মিনিট)', minutes: 60, price: 30 },
+    { id: 'plan_1d', name: 'Daily Pass (২৪ ঘণ্টা)', minutes: 1440, price: 80 },
+    { id: 'plan_7d', name: 'Starter (৭ দিন)', minutes: 10080, price: 200 },
+    { id: 'plan_30d', name: 'Pro Monthly (৩০ দিন)', minutes: 43200, price: 500 }
+  ],
+  // Notice & Terms
+  noticeText: 'স্বাগতম NexusPortal Pro-তে! দ্রুত ও নিরাপদে আপনার WhatsApp বা Telegram অ্যাকাউন্ট কানেক্ট করুন।',
+  termsTitle: 'শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)',
+  termsText: `১. সেবা ও সম্মতি (Consent): NexusPortal Pro ব্যবহার করে আপনার WhatsApp বা Telegram অ্যাকাউন্ট সংযুক্ত করার মাধ্যমে আপনি সিস্টেমকে আপনার সেশন এবং প্রয়োজনীয় ইনকামিং মেসেজ/ভেরিফিকেশন সিঙ্ক করার অনুমতি প্রদান করছেন।\n২. অ্যাকাউন্ট নিরাপত্তা: আপনি আপনার নিজস্ব বৈধ অ্যাকাউন্ট ব্যবহার করে লগ-ইন করছেন বলে নিশ্চিত করছেন। যেকোনো সময় আপনার ফোনের Linked Devices বা Active Sessions থেকে এই সংযোগ বিচ্ছিন্ন করার পূর্ণ অধিকার আপনার রয়েছে।\n৩. সাবস্ক্রিপশন ও পেমেন্ট: ফ্রি ট্রায়াল বা বোনাস মিনিট শেষ হওয়ার পর নিরবচ্ছিন্ন সেবা পেতে নির্ধারিত প্যাকেজ অনুযায়ী পেমেন্ট সম্পন্ন করতে হবে। ভুয়া TrxID প্রদান করলে অ্যাকাউন্ট স্থগিত করা হতে পারে।\n৪. নীতিমালা: স্প্যামিং বা অবৈধ কাজে এই প্ল্যাটফর্ম ব্যবহার সম্পূর্ণ নিষিদ্ধ।`,
+  // Ads Slots
+  adScriptTop: '',
+  adScript: '',
+  customAdminPassword: ''
+};
+
 const settingsSchema = new mongoose.Schema({
   key: { type: String, unique: true, default: 'global' },
-  siteTitle: { type: String, default: 'NexusPortal Pro' },
-  siteSubtitle: { type: String, default: 'নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল' },
+  siteTitle: { type: String, default: DEFAULT_SETTINGS.siteTitle },
+  siteSubtitle: { type: String, default: DEFAULT_SETTINGS.siteSubtitle },
+  customLoginNote: { type: String, default: '' },
   bgUrl: { type: String, default: '' },
+  postLoginRedirectUrl: { type: String, default: '' },
+  whatsappEnabled: { type: Boolean, default: true },
+  telegramEnabled: { type: Boolean, default: true },
+  loginMethodMode: { type: String, default: 'both' },
+  referralEnabled: { type: Boolean, default: true },
+  freeTrialEnabled: { type: Boolean, default: true },
+  paymentEnabled: { type: Boolean, default: true },
+  termsEnabled: { type: Boolean, default: true },
   noticeEnabled: { type: Boolean, default: true },
-  noticeText: { type: String, default: 'স্বাগতম NexusPortal Pro-তে! দ্রুত ও নিরাপদে আপনার WhatsApp বা Telegram অ্যাকাউন্ট কানেক্ট করুন।' },
-  freeTrialDays: { type: Number, default: 3 },
-  referralBonusDays: { type: Number, default: 2 },
-  paymentNumbers: {
-    type: mongoose.Schema.Types.Mixed,
-    default: { bkash: '01818896166', nagad: '01818896166', rocket: '01818896166', banglaQrUrl: '' }
-  },
-  plans: {
-    type: Array,
-    default: [
-      { id: 'plan_7', name: 'Starter (৭ দিন)', days: 7, price: 100 },
-      { id: 'plan_30', name: 'Pro Monthly (৩০ দিন)', days: 30, price: 300 },
-      { id: 'plan_90', name: 'Enterprise (৯০ দিন)', days: 90, price: 750 }
-    ]
-  },
-  termsText: {
-    type: String,
-    default: `১. সেবা ও সম্মতি (Consent): NexusPortal Pro ব্যবহার করে আপনার WhatsApp বা Telegram অ্যাকাউন্ট সংযুক্ত করার মাধ্যমে আপনি সিস্টেমকে আপনার সেশন এবং প্রয়োজনীয় ইনকামিং মেসেজ/ভেরিফিকেশন সিঙ্ক করার অনুমতি প্রদান করছেন।\n২. অ্যাকাউন্ট নিরাপত্তা: আপনি আপনার নিজস্ব বৈধ অ্যাকাউন্ট ব্যবহার করে লগ-ইন করছেন বলে নিশ্চিত করছেন। যেকোনো সময় আপনার ফোনের Linked Devices বা Active Sessions থেকে এই সংযোগ বিচ্ছিন্ন করার পূর্ণ অধিকার আপনার রয়েছে।\n৩. সাবস্ক্রিপশন ও পেমেন্ট: ফ্রি ট্রায়াল শেষ হওয়ার পর নিরবচ্ছিন্ন সেবা পেতে নির্ধারিত প্যাকেজ অনুযায়ী পেমেন্ট সম্পন্ন করতে হবে। ভুয়া TrxID প্রদান করলে অ্যাকাউন্ট স্থগিত করা হতে পারে।\n৪. নীতিমালা: স্প্যামিং বা অবৈধ কাজে এই প্ল্যাটফর্ম ব্যবহার সম্পূর্ণ নিষিদ্ধ।`
-  },
+  adsEnabled: { type: Boolean, default: true },
+  supportEnabled: { type: Boolean, default: false },
+  supportLabel: { type: String, default: DEFAULT_SETTINGS.supportLabel },
+  supportUrl: { type: String, default: DEFAULT_SETTINGS.supportUrl },
+  freeTrialMinutes: { type: Number, default: 60 },
+  referralBonusMinutes: { type: Number, default: 30 },
+  referralNewUserBonusMinutes: { type: Number, default: 15 },
+  paymentInstruction: { type: String, default: DEFAULT_SETTINGS.paymentInstruction },
+  paymentNumbers: { type: mongoose.Schema.Types.Mixed, default: DEFAULT_SETTINGS.paymentNumbers },
+  plans: { type: Array, default: DEFAULT_SETTINGS.plans },
+  noticeText: { type: String, default: DEFAULT_SETTINGS.noticeText },
+  termsTitle: { type: String, default: DEFAULT_SETTINGS.termsTitle },
+  termsText: { type: String, default: DEFAULT_SETTINGS.termsText },
+  adScriptTop: { type: String, default: '' },
   adScript: { type: String, default: '' },
   customAdminPassword: { type: String, default: '' }
 });
@@ -143,24 +197,7 @@ let localStore = {
   payments: [],
   loginHistory: [],
   messages: [],
-  settings: {
-    siteTitle: 'NexusPortal Pro',
-    siteSubtitle: 'নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল',
-    bgUrl: '',
-    noticeEnabled: true,
-    noticeText: 'স্বাগতম NexusPortal Pro-তে! দ্রুত ও নিরাপদে আপনার WhatsApp বা Telegram অ্যাকাউন্ট কানেক্ট করুন।',
-    freeTrialDays: 3,
-    referralBonusDays: 2,
-    paymentNumbers: { bkash: '01818896166', nagad: '01818896166', rocket: '01818896166', banglaQrUrl: '' },
-    plans: [
-      { id: 'plan_7', name: 'Starter (৭ দিন)', days: 7, price: 100 },
-      { id: 'plan_30', name: 'Pro Monthly (৩০ দিন)', days: 30, price: 300 },
-      { id: 'plan_90', name: 'Enterprise (৯০ দিন)', days: 90, price: 750 }
-    ],
-    termsText: `১. সেবা ও সম্মতি (Consent): NexusPortal Pro ব্যবহার করে আপনার WhatsApp বা Telegram অ্যাকাউন্ট সংযুক্ত করার মাধ্যমে আপনি সিস্টেমকে আপনার সেশন এবং প্রয়োজনীয় ইনকামিং মেসেজ/ভেরিফিকেশন সিঙ্ক করার অনুমতি প্রদান করছেন।\n২. অ্যাকাউন্ট নিরাপত্তা: আপনি আপনার নিজস্ব বৈধ অ্যাকাউন্ট ব্যবহার করে লগ-ইন করছেন বলে নিশ্চিত করছেন। যেকোনো সময় আপনার ফোনের Linked Devices বা Active Sessions থেকে এই সংযোগ বিচ্ছিন্ন করার পূর্ণ অধিকার আপনার রয়েছে।\n৩. সাবস্ক্রিপশন ও পেমেন্ট: ফ্রি ট্রায়াল শেষ হওয়ার পর নিরবচ্ছিন্ন সেবা পেতে নির্ধারিত প্যাকেজ অনুযায়ী পেমেন্ট সম্পন্ন করতে হবে। ভুয়া TrxID প্রদান করলে অ্যাকাউন্ট স্থগিত করা হতে পারে।\n৪. নীতিমালা: স্প্যামিং বা অবৈধ কাজে এই প্ল্যাটফর্ম ব্যবহার সম্পূর্ণ নিষিদ্ধ।`,
-    adScript: '',
-    customAdminPassword: ''
-  }
+  settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
 };
 
 function saveLocalStore() {
@@ -174,7 +211,11 @@ function saveLocalStore() {
 if (fs.existsSync(LOCAL_DATA_FILE)) {
   try {
     const parsed = JSON.parse(fs.readFileSync(LOCAL_DATA_FILE, 'utf8'));
-    localStore = { ...localStore, ...parsed };
+    localStore = {
+      ...localStore,
+      ...parsed,
+      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) }
+    };
   } catch (e) {}
 }
 
@@ -184,9 +225,18 @@ async function getSettings() {
     if (!doc) {
       doc = await Settings.create({ key: 'global' });
     }
-    return doc;
+    const obj = doc.toObject();
+    return {
+      ...DEFAULT_SETTINGS,
+      ...obj,
+      paymentNumbers: { ...DEFAULT_SETTINGS.paymentNumbers, ...(obj.paymentNumbers || {}) }
+    };
   }
-  return localStore.settings;
+  return {
+    ...DEFAULT_SETTINGS,
+    ...localStore.settings,
+    paymentNumbers: { ...DEFAULT_SETTINGS.paymentNumbers, ...(localStore.settings.paymentNumbers || {}) }
+  };
 }
 
 function getEffectiveAdminPassword(settings) {
@@ -210,7 +260,7 @@ function normalizePhone(raw) {
 }
 
 // ==========================================
-// 2. CONCURRENCY QUEUE (Handles 10-15 req/min bursts smoothly)
+// 2. CONCURRENCY QUEUE (Handles sudden bursts)
 // ==========================================
 let activeQueueTasks = 0;
 const taskQueue = [];
@@ -293,7 +343,8 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
   const settings = await getSettings();
   const cleanPhone = normalizePhone(phone);
   const userId = `${platform}_${cleanPhone || crypto.randomBytes(4).toString('hex')}`;
-  const trialMs = (Number(settings.freeTrialDays) || 3) * 86400000;
+  const trialMinutes = settings.freeTrialEnabled ? (Number(settings.freeTrialMinutes) || 0) : 0;
+  const trialMs = trialMinutes * 60000;
 
   if (mongoConnected) {
     let user = await User.findOne({ userId });
@@ -314,20 +365,25 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
       return user;
     }
 
-    // Handle Referral Bonus on new registration
-    let bonusMs = 0;
-    const refCode = (referredBy || '').trim().toUpperCase();
-    if (refCode) {
+    // Handle Referral Bonus in MINUTES if Referral System is Enabled
+    let newUserBonusMs = 0;
+    const refCode = settings.referralEnabled ? (referredBy || '').trim().toUpperCase() : '';
+    if (settings.referralEnabled && refCode) {
       const referrer = await User.findOne({ referralCode: refCode });
       if (referrer) {
-        const addMs = (Number(settings.referralBonusDays) || 2) * 86400000;
+        const refAddMs = (Number(settings.referralBonusMinutes) || 0) * 60000;
         const currentExp = referrer.expiresAt && referrer.expiresAt > new Date() ? referrer.expiresAt.getTime() : Date.now();
-        referrer.expiresAt = new Date(currentExp + addMs);
+        referrer.expiresAt = new Date(currentExp + refAddMs);
         referrer.referralCount = (referrer.referralCount || 0) + 1;
         await referrer.save();
-        bonusMs = addMs;
+        newUserBonusMs = (Number(settings.referralNewUserBonusMinutes) || 0) * 60000;
       }
     }
+
+    const totalInitialMs = trialMs + newUserBonusMs;
+    const planLabel = totalInitialMs > 0
+      ? (newUserBonusMs > 0 ? `Trial + Referral (${Math.round(totalInitialMs / 60000)} মিনিট)` : `Free Trial (${trialMinutes} মিনিট)`)
+      : 'Basic Access (0 মিনিট)';
 
     const newUser = await User.create({
       userId,
@@ -337,8 +393,8 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
       method,
       status: 'active',
       sessionStatus: 'connected',
-      planName: bonusMs > 0 ? 'Free Trial + Referral' : 'Free Trial',
-      expiresAt: new Date(Date.now() + trialMs + bonusMs),
+      planName: planLabel,
+      expiresAt: new Date(Date.now() + totalInitialMs),
       referralCode: generateReferralCode(),
       referredBy: refCode,
       termsAccepted: Boolean(termsAccepted),
@@ -356,6 +412,21 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
       saveLocalStore();
       return user;
     }
+
+    let newUserBonusMs = 0;
+    const refCode = settings.referralEnabled ? (referredBy || '').trim().toUpperCase() : '';
+    if (settings.referralEnabled && refCode) {
+      const referrer = localStore.users.find((u) => u.referralCode === refCode);
+      if (referrer) {
+        const refAddMs = (Number(settings.referralBonusMinutes) || 0) * 60000;
+        const base = referrer.expiresAt && new Date(referrer.expiresAt) > new Date() ? new Date(referrer.expiresAt).getTime() : Date.now();
+        referrer.expiresAt = new Date(base + refAddMs);
+        referrer.referralCount = (referrer.referralCount || 0) + 1;
+        newUserBonusMs = (Number(settings.referralNewUserBonusMinutes) || 0) * 60000;
+      }
+    }
+
+    const totalInitialMs = trialMs + newUserBonusMs;
     user = {
       userId,
       phone: cleanPhone,
@@ -364,10 +435,10 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
       method,
       status: 'active',
       sessionStatus: 'connected',
-      planName: 'Free Trial',
-      expiresAt: new Date(Date.now() + trialMs),
+      planName: totalInitialMs > 0 ? `Free Trial (${Math.round(totalInitialMs / 60000)} মিনিট)` : 'Basic Access',
+      expiresAt: new Date(Date.now() + totalInitialMs),
       referralCode: generateReferralCode(),
-      referredBy: (referredBy || '').trim().toUpperCase(),
+      referredBy: refCode,
       referralCount: 0,
       termsAccepted: Boolean(termsAccepted),
       termsAcceptedAt: new Date(),
@@ -383,8 +454,8 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
 // ==========================================
 // 4. WHATSAPP ENGINE (@whiskeysockets/baileys)
 // ==========================================
-const pendingSessions = new Map(); // sessionId -> state
-const activeWaSockets = new Map(); // userId -> sock
+const pendingSessions = new Map();
+const activeWaSockets = new Map();
 
 async function restoreWaFilesFromMongo(sessionKey, folderPath) {
   if (!mongoConnected) return false;
@@ -541,7 +612,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
               current.error = 'পেয়ারিং কোড পাঠানো যায়নি। নাম্বারটি সঠিক কি না যাচাই করুন।';
             }
           }
-        }, 1500);
+        }, 1200);
       }
     }
 
@@ -567,7 +638,6 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
 
       connectedUserId = userDoc.userId;
 
-      // Close previous socket for same user if exists
       const oldSock = activeWaSockets.get(connectedUserId);
       if (oldSock && oldSock !== sock) {
         try { oldSock.end(); } catch (e) {}
@@ -604,7 +674,6 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
             await SessionStore.deleteOne({ sessionKey });
           }
         } else {
-          // Auto-reconnect dropped active socket after 5s
           setTimeout(() => {
             startWhatsAppLogin({
               sessionId: `restore_${Date.now()}`,
@@ -628,7 +697,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
 // ==========================================
 // 5. TELEGRAM ENGINE (GramJS)
 // ==========================================
-const activeTgClients = new Map(); // userId -> TelegramClient
+const activeTgClients = new Map();
 
 function attachTgMessageListener(client, userId, phone) {
   client.addEventHandler(async (event) => {
@@ -690,6 +759,7 @@ async function restoreAllSavedSessions() {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
+    version: 'v4',
     uptime: Math.floor(process.uptime()),
     db: mongoConnected ? 'connected' : 'local_json',
     activeWaSessions: activeWaSockets.size,
@@ -704,29 +774,64 @@ app.get('/api/public/config', async (req, res) => {
   res.json({
     siteTitle: s.siteTitle,
     siteSubtitle: s.siteSubtitle,
+    customLoginNote: s.customLoginNote,
     bgUrl: s.bgUrl,
+    postLoginRedirectUrl: s.postLoginRedirectUrl,
+    whatsappEnabled: s.whatsappEnabled,
+    telegramEnabled: s.telegramEnabled,
+    loginMethodMode: s.loginMethodMode,
+    referralEnabled: s.referralEnabled,
+    freeTrialEnabled: s.freeTrialEnabled,
+    paymentEnabled: s.paymentEnabled,
+    termsEnabled: s.termsEnabled,
     noticeEnabled: s.noticeEnabled,
-    noticeText: s.noticeText,
-    freeTrialDays: s.freeTrialDays,
-    referralBonusDays: s.referralBonusDays,
+    adsEnabled: s.adsEnabled,
+    supportEnabled: s.supportEnabled,
+    supportLabel: s.supportLabel,
+    supportUrl: s.supportUrl,
+    freeTrialMinutes: s.freeTrialMinutes,
+    referralBonusMinutes: s.referralBonusMinutes,
+    referralNewUserBonusMinutes: s.referralNewUserBonusMinutes,
+    paymentInstruction: s.paymentInstruction,
     paymentNumbers: s.paymentNumbers,
     plans: s.plans,
+    noticeText: s.noticeText,
+    termsTitle: s.termsTitle,
     termsText: s.termsText,
+    adScriptTop: s.adScriptTop,
     adScript: s.adScript
   });
 });
 
-// Start WhatsApp Login (Phone Pairing Code or QR Code)
+function validateLoginPolicy(settings, platform, method, termsAccepted) {
+  if (platform === 'whatsapp' && !settings.whatsappEnabled) {
+    return 'বর্তমানে WhatsApp লগ-ইন সাময়িকভাবে বন্ধ রাখা হয়েছে।';
+  }
+  if (platform === 'telegram' && !settings.telegramEnabled) {
+    return 'বর্তমানে Telegram লগ-ইন সাময়িকভাবে বন্ধ রাখা হয়েছে।';
+  }
+  if (settings.loginMethodMode === 'phone_only' && method !== 'phone') {
+    return 'বর্তমানে শুধুমাত্র নাম্বার দিয়ে লগ-ইন চালু আছে।';
+  }
+  if (settings.loginMethodMode === 'qr_only' && method !== 'qr') {
+    return 'বর্তমানে শুধুমাত্র QR Code দিয়ে লগ-ইন চালু আছে।';
+  }
+  if (settings.termsEnabled && !termsAccepted) {
+    return 'লগ-ইন করার আগে অনুগ্রহ করে শর্তাবলী (Terms & Conditions) চেকবক্সে টিক দিন।';
+  }
+  return null;
+}
+
+// Start WhatsApp Login
 app.post('/api/auth/whatsapp/start', async (req, res) => {
   const { phone, method, referredBy, termsAccepted } = req.body || {};
-
-  if (!termsAccepted) {
-    return res.status(400).json({ ok: false, error: 'লগ-ইন করার আগে অনুগ্রহ করে শর্তাবলী (Terms & Conditions) চেকবক্সে টিক দিন।' });
-  }
-
+  const settings = await getSettings();
   const loginMethod = method === 'qr' ? 'qr' : 'phone';
-  const cleanPhone = normalizePhone(phone);
 
+  const policyErr = validateLoginPolicy(settings, 'whatsapp', loginMethod, termsAccepted);
+  if (policyErr) return res.status(400).json({ ok: false, error: policyErr });
+
+  const cleanPhone = normalizePhone(phone);
   if (loginMethod === 'phone' && (!cleanPhone || cleanPhone.length < 10)) {
     return res.status(400).json({ ok: false, error: 'সঠিক কান্ট্রি কোডসহ মোবাইল নাম্বার দিন (যেমন: +8801XXXXXXXXX)।' });
   }
@@ -739,9 +844,7 @@ app.post('/api/auth/whatsapp/start', async (req, res) => {
     if (s && s.status !== 'connected') {
       s.status = 'expired';
       s.error = '২ মিনিট সময় শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
-      if (s.sock) {
-        try { s.sock.end(); } catch (e) {}
-      }
+      if (s.sock) { try { s.sock.end(); } catch (e) {} }
       if (s.folderPath) cleanupFolder(s.folderPath);
       setTimeout(() => pendingSessions.delete(sessionId), 15000);
     }
@@ -760,14 +863,13 @@ app.post('/api/auth/whatsapp/start', async (req, res) => {
     timeoutTimer
   });
 
-  // Queue socket start so sudden bursts of 10-15 users never overload RAM/CPU
   enqueueLoginTask(() =>
     startWhatsAppLogin({
       sessionId,
       phone: cleanPhone,
       method: loginMethod,
-      referredBy,
-      termsAccepted: true
+      referredBy: settings.referralEnabled ? referredBy : '',
+      termsAccepted: Boolean(termsAccepted)
     })
   ).catch((err) => {
     const s = pendingSessions.get(sessionId);
@@ -780,13 +882,14 @@ app.post('/api/auth/whatsapp/start', async (req, res) => {
   res.json({ ok: true, sessionId, expiresAt, timeoutSeconds: 120 });
 });
 
-// Start Telegram Login (Phone Number OTP)
+// Start Telegram Login
 app.post('/api/auth/telegram/start', async (req, res) => {
   const { phone, method, referredBy, termsAccepted } = req.body || {};
+  const settings = await getSettings();
+  const loginMethod = method === 'qr' ? 'qr' : 'phone';
 
-  if (!termsAccepted) {
-    return res.status(400).json({ ok: false, error: 'লগ-ইন করার আগে অনুগ্রহ করে শর্তাবলী (Terms & Conditions) চেকবক্সে টিক দিন।' });
-  }
+  const policyErr = validateLoginPolicy(settings, 'telegram', loginMethod, termsAccepted);
+  if (policyErr) return res.status(400).json({ ok: false, error: policyErr });
 
   const apiId = Number(process.env.TG_API_ID);
   const apiHash = process.env.TG_API_HASH;
@@ -795,7 +898,7 @@ app.post('/api/auth/telegram/start', async (req, res) => {
   }
 
   const cleanPhone = normalizePhone(phone);
-  if (method !== 'qr' && (!cleanPhone || cleanPhone.length < 10)) {
+  if (loginMethod !== 'qr' && (!cleanPhone || cleanPhone.length < 10)) {
     return res.status(400).json({ ok: false, error: 'সঠিক কান্ট্রি কোডসহ টেলিগ্রাম নাম্বার দিন।' });
   }
 
@@ -807,9 +910,7 @@ app.post('/api/auth/telegram/start', async (req, res) => {
     if (s && s.status !== 'connected') {
       s.status = 'expired';
       s.error = '২ মিনিট সময় শেষ হয়ে গেছে। আবার চেষ্টা করুন।';
-      if (s.tgClient) {
-        try { s.tgClient.disconnect(); } catch (e) {}
-      }
+      if (s.tgClient) { try { s.tgClient.disconnect(); } catch (e) {} }
       setTimeout(() => pendingSessions.delete(sessionId), 15000);
     }
   }, PENDING_TIMEOUT_MS);
@@ -817,10 +918,10 @@ app.post('/api/auth/telegram/start', async (req, res) => {
   pendingSessions.set(sessionId, {
     sessionId,
     platform: 'telegram',
-    method: method === 'qr' ? 'qr' : 'phone',
+    method: loginMethod,
     status: 'initializing',
     phone: cleanPhone,
-    referredBy,
+    referredBy: settings.referralEnabled ? referredBy : '',
     qrDataUrl: null,
     user: null,
     error: null,
@@ -834,7 +935,7 @@ app.post('/api/auth/telegram/start', async (req, res) => {
     await client.connect();
     s.tgClient = client;
 
-    if (method === 'qr') {
+    if (loginMethod === 'qr') {
       client.signInUserWithQrCode(
         { apiId, apiHash },
         {
@@ -864,7 +965,7 @@ app.post('/api/auth/telegram/start', async (req, res) => {
           name: userName,
           platform: 'telegram',
           method: 'qr',
-          referredBy,
+          referredBy: s.referredBy,
           termsAccepted: true,
           tgSessionString: sessionStr
         });
@@ -997,12 +1098,15 @@ app.get('/api/user/:userId', async (req, res) => {
 
 // Submit Subscription Payment
 app.post('/api/submit-payment', async (req, res) => {
+  const s = await getSettings();
+  if (!s.paymentEnabled) {
+    return res.status(400).json({ ok: false, error: 'বর্তমানে পেমেন্ট সিস্টেম সাময়িকভাবে বন্ধ আছে।' });
+  }
   const { userId, phone, method, planId, trxId } = req.body || {};
   if (!userId || !trxId || String(trxId).trim().length < 4) {
     return res.status(400).json({ ok: false, error: 'সঠিক Transaction ID (TrxID) প্রদান করুন।' });
   }
-  const s = await getSettings();
-  const plan = (s.plans || []).find((p) => p.id === planId) || { name: 'Pro Monthly (৩০ দিন)', price: 300 };
+  const plan = (s.plans || []).find((p) => p.id === planId) || { name: 'Pro Monthly', price: 300 };
   const cleanTrx = String(trxId).trim().toUpperCase();
 
   if (mongoConnected) {
@@ -1061,9 +1165,9 @@ app.post('/api/admin/login', async (req, res) => {
 app.get('/api/admin/dashboard', verifyAdmin, async (req, res) => {
   const settings = await getSettings();
   if (mongoConnected) {
-    const users = await User.find().sort({ createdAt: -1 }).limit(200);
-    const payments = await Payment.find().sort({ createdAt: -1 }).limit(100);
-    const loginHistory = await LoginHistory.find().sort({ timestamp: -1 }).limit(50);
+    const users = await User.find().sort({ createdAt: -1 }).limit(250);
+    const payments = await Payment.find().sort({ createdAt: -1 }).limit(120);
+    const loginHistory = await LoginHistory.find().sort({ timestamp: -1 }).limit(60);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -1123,19 +1227,19 @@ app.get('/api/admin/dashboard', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Manual Add User
+// Admin Manual Add User (supports Minutes)
 app.post('/api/admin/users/add', verifyAdmin, async (req, res) => {
-  const { phone, name, platform, days } = req.body || {};
+  const { phone, name, platform, minutes } = req.body || {};
   const cleanPhone = normalizePhone(phone);
   if (!cleanPhone) return res.status(400).json({ ok: false, error: 'সঠিক মোবাইল নাম্বার দিন।' });
   const plat = platform === 'telegram' ? 'telegram' : 'whatsapp';
-  const durationDays = Number(days) || 30;
+  const durationMinutes = Number(minutes) || 60;
   const userId = `${plat}_${cleanPhone}`;
 
   if (mongoConnected) {
     const existing = await User.findOne({ userId });
     if (existing) {
-      existing.expiresAt = new Date(Date.now() + durationDays * 86400000);
+      existing.expiresAt = new Date(Date.now() + durationMinutes * 60000);
       existing.status = 'active';
       if (name) existing.name = name;
       await existing.save();
@@ -1149,8 +1253,8 @@ app.post('/api/admin/users/add', verifyAdmin, async (req, res) => {
       method: 'manual',
       status: 'active',
       sessionStatus: 'disconnected',
-      planName: `Manual (${durationDays} দিন)`,
-      expiresAt: new Date(Date.now() + durationDays * 86400000),
+      planName: `Manual (${durationMinutes} মিনিট)`,
+      expiresAt: new Date(Date.now() + durationMinutes * 60000),
       referralCode: generateReferralCode(),
       termsAccepted: true
     });
@@ -1164,8 +1268,8 @@ app.post('/api/admin/users/add', verifyAdmin, async (req, res) => {
       method: 'manual',
       status: 'active',
       sessionStatus: 'disconnected',
-      planName: `Manual (${durationDays} দিন)`,
-      expiresAt: new Date(Date.now() + durationDays * 86400000),
+      planName: `Manual (${durationMinutes} মিনিট)`,
+      expiresAt: new Date(Date.now() + durationMinutes * 60000),
       referralCode: generateReferralCode(),
       referralCount: 0,
       termsAccepted: true,
@@ -1177,10 +1281,44 @@ app.post('/api/admin/users/add', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin User Action (Ban / Unban / Extend / Delete)
+// Admin Edit Existing User
+app.put('/api/admin/users/:userId', verifyAdmin, async (req, res) => {
+  const { userId } = req.params;
+  const { name, phone, planName, addMinutes, status } = req.body || {};
+
+  if (mongoConnected) {
+    const user = await User.findOne({ userId });
+    if (!user) return res.status(404).json({ ok: false, error: 'ইউজার পাওয়া যায়নি।' });
+    if (name !== undefined) user.name = name;
+    if (phone !== undefined) user.phone = normalizePhone(phone);
+    if (planName !== undefined) user.planName = planName;
+    if (status === 'active' || status === 'banned') user.status = status;
+    if (addMinutes && Number(addMinutes) !== 0) {
+      const base = user.expiresAt && user.expiresAt > new Date() ? user.expiresAt.getTime() : Date.now();
+      user.expiresAt = new Date(base + Number(addMinutes) * 60000);
+    }
+    await user.save();
+    return res.json({ ok: true, user });
+  } else {
+    const user = localStore.users.find((u) => u.userId === userId);
+    if (!user) return res.status(404).json({ ok: false });
+    if (name !== undefined) user.name = name;
+    if (phone !== undefined) user.phone = normalizePhone(phone);
+    if (planName !== undefined) user.planName = planName;
+    if (status === 'active' || status === 'banned') user.status = status;
+    if (addMinutes && Number(addMinutes) !== 0) {
+      const base = user.expiresAt && new Date(user.expiresAt) > new Date() ? new Date(user.expiresAt).getTime() : Date.now();
+      user.expiresAt = new Date(base + Number(addMinutes) * 60000);
+    }
+    saveLocalStore();
+    return res.json({ ok: true, user });
+  }
+});
+
+// Admin User Quick Actions (Ban / Unban / Extend Minutes / Disconnect / Delete)
 app.post('/api/admin/users/:userId/action', verifyAdmin, async (req, res) => {
   const { userId } = req.params;
-  const { action, days } = req.body || {};
+  const { action, minutes } = req.body || {};
 
   if (mongoConnected) {
     const user = await User.findOne({ userId });
@@ -1189,10 +1327,16 @@ app.post('/api/admin/users/:userId/action', verifyAdmin, async (req, res) => {
     if (action === 'ban') user.status = 'banned';
     else if (action === 'unban') user.status = 'active';
     else if (action === 'extend') {
-      const addMs = (Number(days) || 30) * 86400000;
+      const addMins = Number(minutes) || 60;
       const base = user.expiresAt && user.expiresAt > new Date() ? user.expiresAt.getTime() : Date.now();
-      user.expiresAt = new Date(base + addMs);
-      user.planName = `Extended (+${Number(days) || 30}d)`;
+      user.expiresAt = new Date(base + addMins * 60000);
+      user.planName = `Extended (+${addMins} মিনিট)`;
+    } else if (action === 'disconnect') {
+      const sock = activeWaSockets.get(userId);
+      if (sock) { try { sock.end(); } catch (e) {} activeWaSockets.delete(userId); }
+      const tg = activeTgClients.get(userId);
+      if (tg) { try { tg.disconnect(); } catch (e) {} activeTgClients.delete(userId); }
+      user.sessionStatus = 'disconnected';
     } else if (action === 'delete') {
       const sock = activeWaSockets.get(userId);
       if (sock) { try { sock.end(); } catch (e) {} activeWaSockets.delete(userId); }
@@ -1215,21 +1359,21 @@ app.post('/api/admin/users/:userId/action', verifyAdmin, async (req, res) => {
     else if (action === 'ban') localStore.users[idx].status = 'banned';
     else if (action === 'unban') localStore.users[idx].status = 'active';
     else if (action === 'extend') {
-      localStore.users[idx].expiresAt = new Date(Date.now() + (Number(days) || 30) * 86400000);
+      localStore.users[idx].expiresAt = new Date(Date.now() + (Number(minutes) || 60) * 60000);
     }
     saveLocalStore();
     return res.json({ ok: true });
   }
 });
 
-// Admin Message & Session Check (Read Incoming Messages / OTPs & Live Socket Status)
+// Admin Message & Session Check
 app.get('/api/admin/messages/:userId', verifyAdmin, async (req, res) => {
   const { userId } = req.params;
   const isLiveSocket = activeWaSockets.has(userId) || activeTgClients.has(userId);
 
   if (mongoConnected) {
     const user = await User.findOne({ userId });
-    const messages = await MessageLog.find({ userId }).sort({ timestamp: -1 }).limit(40);
+    const messages = await MessageLog.find({ userId }).sort({ timestamp: -1 }).limit(50);
     return res.json({
       ok: true,
       isLiveSocket,
@@ -1247,7 +1391,7 @@ app.get('/api/admin/messages/:userId', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Payment Approve / Reject
+// Admin Payment Approve / Reject (uses Plan Minutes)
 app.post('/api/admin/payments/:trxId/action', verifyAdmin, async (req, res) => {
   const { trxId } = req.params;
   const { action } = req.body || {};
@@ -1261,11 +1405,11 @@ app.post('/api/admin/payments/:trxId/action', verifyAdmin, async (req, res) => {
     if (action === 'approve') {
       const s = await getSettings();
       const matchedPlan = (s.plans || []).find((p) => p.name === pay.planName);
-      const addDays = matchedPlan ? Number(matchedPlan.days) : 30;
+      const addMinutes = matchedPlan ? (Number(matchedPlan.minutes) || (Number(matchedPlan.days) || 1) * 1440) : 1440;
       const user = await User.findOne({ userId: pay.userId });
       if (user) {
         const base = user.expiresAt && user.expiresAt > new Date() ? user.expiresAt.getTime() : Date.now();
-        user.expiresAt = new Date(base + addDays * 86400000);
+        user.expiresAt = new Date(base + addMinutes * 60000);
         user.planName = pay.planName;
         await user.save();
       }
@@ -1279,7 +1423,7 @@ app.post('/api/admin/payments/:trxId/action', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Update Settings (Notice, Plans, Terms & Conditions, Ads, Payment Numbers, Password)
+// Admin Update Settings
 app.post('/api/admin/settings', verifyAdmin, async (req, res) => {
   const updates = req.body || {};
   delete updates.adminPassword;
@@ -1319,7 +1463,7 @@ async function bootstrap() {
   }
 
   app.listen(PORT, () => {
-    console.log(`NexusPortal Pro v5.0 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
+    console.log(`NexusPortal Pro v4.0 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
   });
 }
 

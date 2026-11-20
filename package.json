@@ -1,7 +1,7 @@
 {
   "name": "pro-saas-wa-tg-system",
-  "version": "5.0.0",
-  "description": "NexusPortal Pro - High-Concurrency WhatsApp (Baileys) & Telegram SaaS Platform with MongoDB Atlas & Terms Consent",
+  "version": "6.0.0",
+  "description": "NexusPortal Pro v4 - Baileys + GramJS + Full Granular Admin Controls + v2 Admin UI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
