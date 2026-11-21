@@ -157,6 +157,17 @@ const loginHistorySchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 });
 
+// Admin Users Schema (Main Admin + Read-Only Sub-Admins)
+const adminUserSchema = new mongoose.Schema({
+  username: { type: String, unique: true, required: true, trim: true },
+  passwordHash: { type: String, required: true },
+  salt: { type: String, required: true },
+  role: { type: String, enum: ['super_admin', 'viewer'], default: 'viewer' },
+  status: { type: String, enum: ['active', 'disabled'], default: 'active' },
+  createdAt: { type: Date, default: Date.now },
+  lastLoginAt: { type: Date, default: null }
+});
+
 const DEFAULT_SETTINGS = {
   siteTitle: 'NexusPortal Pro',
   siteSubtitle: 'নিরাপদ অ্যাকাউন্ট লগ-ইন ও সাবস্ক্রিপশন পোর্টাল',
@@ -206,6 +217,7 @@ const DEFAULT_SETTINGS = {
   // Ads Slots
   adScriptTop: '',
   adScript: '',
+  customAdminUsername: '',
   customAdminPassword: ''
 };
 
@@ -240,6 +252,7 @@ const settingsSchema = new mongoose.Schema({
   termsText: { type: String, default: DEFAULT_SETTINGS.termsText },
   adScriptTop: { type: String, default: '' },
   adScript: { type: String, default: '' },
+  customAdminUsername: { type: String, default: '' },
   customAdminPassword: { type: String, default: '' }
 });
 
@@ -249,6 +262,7 @@ const MessageLog = mongoose.model('MessageLog', messageLogSchema);
 const Payment = mongoose.model('Payment', paymentSchema);
 const LoginHistory = mongoose.model('LoginHistory', loginHistorySchema);
 const Settings = mongoose.model('Settings', settingsSchema);
+const AdminUser = mongoose.model('AdminUser', adminUserSchema);
 
 // Local JSON Fallback Store
 const LOCAL_DATA_FILE = path.join(__dirname, 'data.json');
@@ -257,6 +271,7 @@ let localStore = {
   payments: [],
   loginHistory: [],
   messages: [],
+  adminUsers: [],
   settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
 };
 
@@ -274,6 +289,7 @@ if (fs.existsSync(LOCAL_DATA_FILE)) {
     localStore = {
       ...localStore,
       ...parsed,
+      adminUsers: Array.isArray(parsed.adminUsers) ? parsed.adminUsers : [],
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) }
     };
   } catch (e) {}
@@ -299,11 +315,61 @@ async function getSettings() {
   };
 }
 
+function getEffectiveAdminUsername(settings) {
+  if (settings && settings.customAdminUsername && settings.customAdminUsername.trim() !== '') {
+    return settings.customAdminUsername.trim();
+  }
+  return (process.env.ADMIN_USERNAME || 'admin').trim();
+}
+
 function getEffectiveAdminPassword(settings) {
   if (settings && settings.customAdminPassword && settings.customAdminPassword.trim() !== '') {
     return settings.customAdminPassword.trim();
   }
   return (process.env.ADMIN_PASSWORD || 'admin123').trim();
+}
+
+// Password Hashing & Admin Session Token Helpers
+const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || crypto.createHash('sha256').update(String(process.env.MONGODB_URI || process.env.ADMIN_PASSWORD || 'nexus_portal_secret_key_2026')).digest('hex');
+
+function hashAdminPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return { salt, passwordHash };
+}
+
+function verifyAdminPasswordHash(password, salt, storedHash) {
+  try {
+    const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+  } catch (e) {
+    return false;
+  }
+}
+
+function createAdminSessionToken(payload) {
+  const data = {
+    username: payload.username,
+    role: payload.role,
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days validity
+  };
+  const encoded = Buffer.from(JSON.stringify(data)).toString('base64url');
+  const sig = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(encoded).digest('base64url');
+  return `${encoded}.${sig}`;
+}
+
+function verifyAdminSessionToken(token) {
+  try {
+    if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+    const [encoded, sig] = token.split('.');
+    const expectedSig = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(encoded).digest('base64url');
+    if (sig !== expectedSig) return null;
+    const decoded = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (!decoded || !decoded.exp || Date.now() > decoded.exp) return null;
+    return decoded;
+  } catch (e) {
+    return null;
+  }
 }
 
 function generateReferralCode() {
@@ -856,7 +922,7 @@ async function restoreAllSavedSessions() {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: 'v4.1',
+    version: 'v4.2',
     uptime: Math.floor(process.uptime()),
     db: mongoConnected ? 'connected' : 'local_json',
     activeWaSessions: activeWaSockets.size,
@@ -1246,30 +1312,280 @@ app.post('/api/submit-payment', async (req, res) => {
 });
 
 // ==========================================
-// 7. ADMIN API ROUTES
+// 7. ADMIN API ROUTES (Main Admin + Read-Only Sub-Admins)
 // ==========================================
 async function verifyAdmin(req, res, next) {
-  const authHeader = req.headers['x-admin-password'] || req.body?.adminPassword || '';
+  const tokenHeader = req.headers['x-admin-token'] || '';
+  const legacyPassHeader = req.headers['x-admin-password'] || req.body?.adminPassword || '';
   const settings = await getSettings();
-  const validPass = getEffectiveAdminPassword(settings);
-  if (authHeader !== validPass) {
-    return res.status(401).json({ ok: false, error: 'ভুল অ্যাডমিন পাসওয়ার্ড!' });
+  const mainUsername = getEffectiveAdminUsername(settings);
+  const mainPass = getEffectiveAdminPassword(settings);
+
+  let authenticatedAdmin = null;
+
+  // 1. Check signed session token first
+  if (tokenHeader) {
+    const decoded = verifyAdminSessionToken(tokenHeader);
+    if (decoded) {
+      if (decoded.role === 'super_admin') {
+        authenticatedAdmin = { username: decoded.username || mainUsername, role: 'super_admin' };
+      } else if (decoded.role === 'viewer') {
+        // Verify sub-admin still exists and is active
+        if (mongoConnected) {
+          const subDoc = await AdminUser.findOne({ username: decoded.username, status: 'active' });
+          if (subDoc) {
+            authenticatedAdmin = { username: subDoc.username, role: subDoc.role };
+          }
+        } else {
+          const subLocal = (localStore.adminUsers || []).find((a) => a.username === decoded.username && a.status === 'active');
+          if (subLocal) {
+            authenticatedAdmin = { username: subLocal.username, role: subLocal.role };
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Fallback to legacy x-admin-password header for Main Admin
+  if (!authenticatedAdmin && legacyPassHeader && legacyPassHeader === mainPass) {
+    authenticatedAdmin = { username: mainUsername, role: 'super_admin' };
+  }
+
+  if (!authenticatedAdmin) {
+    return res.status(401).json({ ok: false, error: 'অ্যাডমিন সেশন সঠিক নয় বা মেয়াদ শেষ হয়েছে। আবার লগ-ইন করুন।' });
+  }
+
+  req.adminUser = authenticatedAdmin;
+
+  // 3. Enforce Read-Only restriction for 'viewer' role on all mutating HTTP methods
+  if (req.adminUser.role === 'viewer' && req.method !== 'GET') {
+    return res.status(403).json({
+      ok: false,
+      error: 'অ্যাক্সেস ডিনাইড! আপনার শুধুমাত্র ডেটা দেখার অনুমতি আছে, কোনো কিছু এডিট বা ডিলিট করার অনুমতি নেই।'
+    });
+  }
+
+  next();
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.adminUser || req.adminUser.role !== 'super_admin') {
+    return res.status(403).json({
+      ok: false,
+      error: 'শুধুমাত্র মেইন অ্যাডমিন (Super Admin) এই কাজটি করতে পারবেন।'
+    });
   }
   next();
 }
 
 app.post('/api/admin/login', async (req, res) => {
-  const { password } = req.body || {};
+  const { username, password } = req.body || {};
+  const inputUser = String(username || '').trim();
+  const inputPass = String(password || '').trim();
+
+  if (!inputPass) {
+    return res.status(401).json({ ok: false, error: 'ইউজারনেম ও পাসওয়ার্ড দিন।' });
+  }
+
   const settings = await getSettings();
-  const validPass = getEffectiveAdminPassword(settings);
-  if ((password || '').trim() === validPass) {
+  const mainUser = getEffectiveAdminUsername(settings);
+  const mainPass = getEffectiveAdminPassword(settings);
+
+  // 1. Check Main Admin credentials
+  if ((!inputUser || inputUser === mainUser) && inputPass === mainPass) {
+    const token = createAdminSessionToken({ username: mainUser, role: 'super_admin' });
+    return res.json({
+      ok: true,
+      token,
+      username: mainUser,
+      role: 'super_admin'
+    });
+  }
+
+  // 2. Check Sub-Admin credentials (Database or Local Fallback)
+  if (inputUser) {
+    if (mongoConnected) {
+      const subAdmin = await AdminUser.findOne({ username: inputUser });
+      if (subAdmin && verifyAdminPasswordHash(inputPass, subAdmin.salt, subAdmin.passwordHash)) {
+        if (subAdmin.status !== 'active') {
+          return res.status(403).json({ ok: false, error: 'আপনার অ্যাডমিন অ্যাকাউন্টটি সাময়িকভাবে নিষ্ক্রিয় করা হয়েছে।' });
+        }
+        subAdmin.lastLoginAt = new Date();
+        await subAdmin.save();
+        const token = createAdminSessionToken({ username: subAdmin.username, role: subAdmin.role });
+        return res.json({
+          ok: true,
+          token,
+          username: subAdmin.username,
+          role: subAdmin.role
+        });
+      }
+    } else {
+      const subAdmin = (localStore.adminUsers || []).find((a) => a.username === inputUser);
+      if (subAdmin && verifyAdminPasswordHash(inputPass, subAdmin.salt, subAdmin.passwordHash)) {
+        if (subAdmin.status !== 'active') {
+          return res.status(403).json({ ok: false, error: 'আপনার অ্যাডমিন অ্যাকাউন্টটি সাময়িকভাবে নিষ্ক্রিয় করা হয়েছে।' });
+        }
+        subAdmin.lastLoginAt = new Date();
+        saveLocalStore();
+        const token = createAdminSessionToken({ username: subAdmin.username, role: subAdmin.role });
+        return res.json({
+          ok: true,
+          token,
+          username: subAdmin.username,
+          role: subAdmin.role
+        });
+      }
+    }
+  }
+
+  return res.status(401).json({ ok: false, error: 'অ্যাডমিন ইউজারনেম বা পাসওয়ার্ড সঠিক নয়।' });
+});
+
+// Sub-Admin Management Routes (Main Admin Only)
+app.get('/api/admin/sub-admins', verifyAdmin, requireSuperAdmin, async (req, res) => {
+  if (mongoConnected) {
+    const admins = await AdminUser.find({}, 'username role status createdAt lastLoginAt').sort({ createdAt: -1 });
+    return res.json({ ok: true, admins });
+  } else {
+    const admins = (localStore.adminUsers || []).map((a) => ({
+      _id: a._id,
+      username: a.username,
+      role: a.role,
+      status: a.status,
+      createdAt: a.createdAt,
+      lastLoginAt: a.lastLoginAt
+    }));
+    return res.json({ ok: true, admins });
+  }
+});
+
+app.post('/api/admin/sub-admins', verifyAdmin, requireSuperAdmin, async (req, res) => {
+  const { username, password } = req.body || {};
+  const cleanUser = String(username || '').trim();
+  const cleanPass = String(password || '').trim();
+
+  if (!cleanUser || cleanUser.length < 3) {
+    return res.status(400).json({ ok: false, error: 'কমপক্ষে ৩ অক্ষরের ইউজারনেম দিন।' });
+  }
+  if (!cleanPass || cleanPass.length < 4) {
+    return res.status(400).json({ ok: false, error: 'কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন।' });
+  }
+
+  const settings = await getSettings();
+  const mainUser = getEffectiveAdminUsername(settings);
+  if (cleanUser.toLowerCase() === mainUser.toLowerCase()) {
+    return res.status(400).json({ ok: false, error: 'মেইন অ্যাডমিনের ইউজারনেম ব্যবহার করা যাবে না।' });
+  }
+
+  const { salt, passwordHash } = hashAdminPassword(cleanPass);
+
+  if (mongoConnected) {
+    const exists = await AdminUser.findOne({ username: cleanUser });
+    if (exists) {
+      return res.status(400).json({ ok: false, error: 'এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হয়েছে!' });
+    }
+    const created = await AdminUser.create({
+      username: cleanUser,
+      passwordHash,
+      salt,
+      role: 'viewer',
+      status: 'active'
+    });
+    return res.json({
+      ok: true,
+      admin: {
+        _id: created._id,
+        username: created.username,
+        role: created.role,
+        status: created.status,
+        createdAt: created.createdAt
+      }
+    });
+  } else {
+    const exists = (localStore.adminUsers || []).find((a) => a.username === cleanUser);
+    if (exists) {
+      return res.status(400).json({ ok: false, error: 'এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হয়েছে!' });
+    }
+    const created = {
+      _id: 'adm_' + crypto.randomBytes(6).toString('hex'),
+      username: cleanUser,
+      passwordHash,
+      salt,
+      role: 'viewer',
+      status: 'active',
+      createdAt: new Date(),
+      lastLoginAt: null
+    };
+    localStore.adminUsers.unshift(created);
+    saveLocalStore();
+    return res.json({
+      ok: true,
+      admin: {
+        _id: created._id,
+        username: created.username,
+        role: created.role,
+        status: created.status,
+        createdAt: created.createdAt
+      }
+    });
+  }
+});
+
+app.put('/api/admin/sub-admins/:id', verifyAdmin, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { password, status } = req.body || {};
+
+  if (mongoConnected) {
+    const adminDoc = await AdminUser.findById(id);
+    if (!adminDoc) return res.status(404).json({ ok: false, error: 'অ্যাডমিন পাওয়া যায়নি।' });
+
+    if (password && String(password).trim().length >= 4) {
+      const { salt, passwordHash } = hashAdminPassword(String(password).trim());
+      adminDoc.salt = salt;
+      adminDoc.passwordHash = passwordHash;
+    }
+    if (status === 'active' || status === 'disabled') {
+      adminDoc.status = status;
+    }
+    await adminDoc.save();
+    return res.json({ ok: true });
+  } else {
+    const adminItem = (localStore.adminUsers || []).find((a) => a._id === id);
+    if (!adminItem) return res.status(404).json({ ok: false, error: 'অ্যাডমিন পাওয়া যায়নি।' });
+
+    if (password && String(password).trim().length >= 4) {
+      const { salt, passwordHash } = hashAdminPassword(String(password).trim());
+      adminItem.salt = salt;
+      adminItem.passwordHash = passwordHash;
+    }
+    if (status === 'active' || status === 'disabled') {
+      adminItem.status = status;
+    }
+    saveLocalStore();
     return res.json({ ok: true });
   }
-  return res.status(401).json({ ok: false, error: 'অ্যাডমিন পাসওয়ার্ড সঠিক নয়।' });
+});
+
+app.delete('/api/admin/sub-admins/:id', verifyAdmin, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (mongoConnected) {
+    await AdminUser.findByIdAndDelete(id);
+    return res.json({ ok: true });
+  } else {
+    localStore.adminUsers = (localStore.adminUsers || []).filter((a) => a._id !== id);
+    saveLocalStore();
+    return res.json({ ok: true });
+  }
 });
 
 app.get('/api/admin/dashboard', verifyAdmin, async (req, res) => {
   const settings = await getSettings();
+  const safeSettings = { ...settings };
+  if (req.adminUser.role !== 'super_admin') {
+    safeSettings.customAdminPassword = '';
+  }
+
   if (mongoConnected) {
     const users = await User.find().sort({ createdAt: -1 }).limit(250);
     const payments = await Payment.find().sort({ createdAt: -1 }).limit(120);
@@ -1297,11 +1613,12 @@ app.get('/api/admin/dashboard', verifyAdmin, async (req, res) => {
       ok: true,
       dbMode: 'mongodb',
       dbName: connectedDbName,
+      adminUser: req.adminUser,
       stats,
       users,
       payments,
       loginHistory,
-      settings
+      settings: safeSettings
     });
   } else {
     const users = localStore.users;
@@ -1324,11 +1641,12 @@ app.get('/api/admin/dashboard', verifyAdmin, async (req, res) => {
       ok: true,
       dbMode: 'local',
       dbName: 'Local JSON',
+      adminUser: req.adminUser,
       stats,
       users,
       payments,
       loginHistory: localStore.loginHistory,
-      settings
+      settings: safeSettings
     });
   }
 });
@@ -1569,7 +1887,7 @@ async function bootstrap() {
   }
 
   app.listen(PORT, () => {
-    console.log(`NexusPortal Pro v4.1 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
+    console.log(`NexusPortal Pro v4.2 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
   });
 }
 
