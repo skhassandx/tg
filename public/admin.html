@@ -234,7 +234,6 @@
 
   <!-- MAIN ADMIN SHELL -->
   <div id="adminShell" class="app-shell hidden">
-    <!-- v2 Style Collapsible Sidebar -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <span class="sidebar-brand">NexusPortal Pro</span>
@@ -306,7 +305,7 @@
           <span>👁️ <b>Read-Only মোড চালু আছে:</b> আপনি সার্ভারের সকল ডেটা দেখতে পারবেন, তবে কোনো কিছু এডিট, সেভ বা ডিলিট করার অনুমতি নেই।</span>
         </div>
 
-        <!-- 1. DASHBOARD OVERVIEW (CLICKABLE STAT CARDS LIKE v2) -->
+        <!-- 1. DASHBOARD OVERVIEW -->
         <section id="sec_dashboard" class="admin-sec">
           <div class="sec-title">
             <span>📊 লাইভ ড্যাশবোর্ড ও কুইক কন্ট্রোল</span>
@@ -359,7 +358,7 @@
           </div>
         </section>
 
-        <!-- 2. ALL USERS LIST (WITH DASHBOARD CLICK FILTERS) -->
+        <!-- 2. ALL USERS LIST -->
         <section id="sec_users" class="admin-sec hidden">
           <div class="sec-title">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -535,7 +534,7 @@
           </div>
         </section>
 
-        <!-- 9. SUBSCRIPTION PLANS & FREE TRIAL (IN MINUTES) -->
+        <!-- 9. SUBSCRIPTION PLANS & FREE TRIAL -->
         <section id="sec_plans" class="admin-sec hidden">
           <div class="sec-title"><span>⏳ সাবস্ক্রিপশন প্যাকেজ ও ফ্রি ট্রায়াল</span></div>
           <div class="panel-box">
@@ -577,7 +576,7 @@
           </div>
         </section>
 
-        <!-- 10. REFERRAL SYSTEM (IN MINUTES) -->
+        <!-- 10. REFERRAL SYSTEM -->
         <section id="sec_referral" class="admin-sec hidden">
           <div class="sec-title"><span>🎁 রেফারেল সিস্টেম ও মিনিট বোনাস</span></div>
           <div class="panel-box">
@@ -750,7 +749,6 @@
               <input id="set_postLoginRedirectUrl" type="text" class="input-ctrl" placeholder="https://example.com/dashboard" />
             </div>
 
-            <!-- Login Session Duration Setting -->
             <div class="panel-box" style="background:#1e293b; margin-top:10px;">
               <label class="field-label">🔒 ইউজার লগ-ইন সেশন সময়কাল (মিনিট — একবার লগ-ইন করলে কত সময় লগ-ইন থাকবে)</label>
               <input id="set_loginSessionMinutes" type="number" min="1" class="input-ctrl" style="max-width:340px;" value="1440" oninput="syncInput('loginSessionMinutes', this.value)" />
@@ -763,7 +761,6 @@
               </div>
             </div>
 
-            <!-- Background Image Upload -->
             <div class="panel-box" style="background:#1e293b; margin-top:10px;">
               <label class="field-label">🖼️ ব্যাকগ্রাউন্ড ইমেজ আপলোড বা URL</label>
               <div class="upload-row">
@@ -795,7 +792,7 @@
           </div>
         </section>
 
-        <!-- 16. SUB-ADMIN USER MANAGEMENT (MAIN ADMIN ONLY - READ-ONLY SUB-ADMINS) -->
+        <!-- 16. SUB-ADMIN USER MANAGEMENT -->
         <section id="sec_sub_admins" class="admin-sec hidden super-admin-only">
           <div class="sec-title"><span>🛡️ অ্যাডমিন ইউজার ম্যানেজমেন্ট (Read-Only সাব-অ্যাডমিন)</span></div>
           <div class="panel-box">
@@ -835,7 +832,7 @@
           </div>
         </section>
 
-        <!-- 17. MAIN ADMIN CREDENTIALS (USERNAME & PASSWORD) -->
+        <!-- 17. MAIN ADMIN CREDENTIALS -->
         <section id="sec_password" class="admin-sec hidden super-admin-only">
           <div class="sec-title"><span>🔐 মেইন অ্যাডমিন ইউজারনেম ও পাসওয়ার্ড পরিবর্তন</span></div>
           <div class="panel-box" style="max-width:440px;">
@@ -915,10 +912,8 @@
         roleBadge.className = 'badge badge-amber';
         roBanner.classList.remove('hidden');
 
-        // Hide super-admin-only sections & sidebar items
         document.querySelectorAll('.super-admin-only').forEach((el) => el.classList.add('hidden'));
 
-        // Disable all mutating buttons
         document.querySelectorAll('.mutating-btn').forEach((btn) => {
           btn.disabled = true;
           btn.title = 'Read-Only মোড: আপনার এডিট বা ডিলিট করার অনুমতি নেই';
@@ -1298,7 +1293,6 @@
       syncInput('loginSessionMinutes', mins);
     }
 
-    // Client-side Canvas Image Compressor & Uploader (Bangla QR & Background)
     function handleImageUpload(fileInput, targetInputId, previewImgId, maxWidth) {
       const file = fileInput.files && fileInput.files[0];
       if (!file) return;
@@ -1536,7 +1530,6 @@
       }
     }
 
-    // Sub-Admin Management Functions (Main Admin Only)
     async function loadSubAdmins() {
       if (currentAdminRole !== 'super_admin') return;
       const res = await fetch('/api/admin/sub-admins', {

