@@ -1,22 +1,23 @@
 {
-  "name": "pro-saas-wa-tg-system",
-  "version": "6.0.0",
-  "description": "NexusPortal Pro v4 - Baileys + GramJS + Full Granular Admin Controls + v2 Admin UI",
+  "name": "nexus-portal-pro",
+  "version": "4.3.0",
+  "description": "NexusPortal Pro - WhatsApp & Telegram Session Sync Portal with Proxy & OTP Resend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.8",
+    "@whiskeysockets/baileys": "^6.7.16",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongoose": "^8.4.0",
-    "pino": "^9.1.0",
-    "qrcode": "^1.5.3",
-    "telegram": "^2.24.14"
+    "input": "^1.0.1",
+    "mongoose": "^8.5.1",
+    "pino": "^9.3.2",
+    "qrcode": "^1.5.4",
+    "telegram": "^2.26.22"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

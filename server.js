@@ -20,6 +20,12 @@ const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 
+const {
+  getTelegramProxyConfig,
+  markProxyBad,
+  getProxyStats
+} = require('./proxy');
+
 const app = express();
 const PORT = process.env.PORT || 10000;
 const PENDING_TIMEOUT_MS = 2 * 60 * 1000; // 2 Minutes Auto-Cleanup Timeout
@@ -29,6 +35,10 @@ const CONCURRENCY_LIMIT = 4;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 const WA_SESSIONS_DIR = path.join('/tmp', 'wa_sessions');
 if (!fs.existsSync(WA_SESSIONS_DIR)) {
@@ -174,11 +184,10 @@ const DEFAULT_SETTINGS = {
   customLoginNote: '',
   bgUrl: '',
   postLoginRedirectUrl: '',
-  loginSessionMinutes: 1440, // Admin-configurable browser login session duration (default 24h / 1440m)
-  // Feature Master Switches
+  loginSessionMinutes: 1440,
   whatsappEnabled: true,
   telegramEnabled: true,
-  loginMethodMode: 'both', // 'both' | 'phone_only' | 'qr_only'
+  loginMethodMode: 'both',
   referralEnabled: true,
   freeTrialEnabled: true,
   paymentEnabled: true,
@@ -188,11 +197,9 @@ const DEFAULT_SETTINGS = {
   supportEnabled: false,
   supportLabel: 'সাপোর্ট / যোগাযোগ',
   supportUrl: 'https://t.me/',
-  // Time & Referral Settings (in Minutes)
   freeTrialMinutes: 60,
   referralBonusMinutes: 30,
   referralNewUserBonusMinutes: 15,
-  // Payment Settings
   paymentInstruction: 'নিচের যেকোনো নাম্বারে Send Money করে Transaction ID (TrxID) সাবমিট করুন।',
   paymentNumbers: {
     bkash: '01818896166',
@@ -210,11 +217,9 @@ const DEFAULT_SETTINGS = {
     { id: 'plan_7d', name: 'Starter (৭ দিন)', minutes: 10080, price: 200 },
     { id: 'plan_30d', name: 'Pro Monthly (৩০ দিন)', minutes: 43200, price: 500 }
   ],
-  // Notice & Terms
   noticeText: 'স্বাগতম NexusPortal Pro-তে! দ্রুত ও নিরাপদে আপনার WhatsApp বা Telegram অ্যাকাউন্ট কানেক্ট করুন।',
   termsTitle: 'শর্তাবলী ও গোপনীয়তা নীতি (Terms & Conditions)',
   termsText: `১. সেবা ও সম্মতি (Consent): NexusPortal Pro ব্যবহার করে আপনার WhatsApp বা Telegram অ্যাকাউন্ট সংযুক্ত করার মাধ্যমে আপনি সিস্টেমকে আপনার সেশন এবং প্রয়োজনীয় ইনকামিং মেসেজ/ভেরিফিকেশন সিঙ্ক করার অনুমতি প্রদান করছেন।\n২. অ্যাকাউন্ট নিরাপত্তা: আপনি আপনার নিজস্ব বৈধ অ্যাকাউন্ট ব্যবহার করে লগ-ইন করছেন বলে নিশ্চিত করছেন। যেকোনো সময় আপনার ফোনের Linked Devices বা Active Sessions থেকে এই সংযোগ বিচ্ছিন্ন করার পূর্ণ অধিকার আপনার রয়েছে।\n৩. সাবস্ক্রিপশন ও পেমেন্ট: ফ্রি ট্রায়াল বা বোনাস মিনিট শেষ হওয়ার পর নিরবচ্ছিন্ন সেবা পেতে নির্ধারিত প্যাকেজ অনুযায়ী পেমেন্ট সম্পন্ন করতে হবে। ভুয়া TrxID প্রদান করলে অ্যাকাউন্ট স্থগিত করা হতে পারে।\n৪. নীতিমালা: স্প্যামিং বা অবৈধ কাজে এই প্ল্যাটফর্ম ব্যবহার সম্পূর্ণ নিষিদ্ধ।`,
-  // Ads Slots
   adScriptTop: '',
   adScript: '',
   customAdminUsername: '',
@@ -351,7 +356,7 @@ function createAdminSessionToken(payload) {
   const data = {
     username: payload.username,
     role: payload.role,
-    exp: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days validity
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000
   };
   const encoded = Buffer.from(JSON.stringify(data)).toString('base64url');
   const sig = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(encoded).digest('base64url');
@@ -382,12 +387,10 @@ function normalizePhone(raw, defaultDialCode = '') {
   let digits = trimmed.replace(/\D/g, '');
   if (!digits) return '';
 
-  // If user pasted full number with '+', keep as-is
   if (trimmed.startsWith('+')) {
     return digits;
   }
 
-  // If a country dial code is provided and digits don't already start with it
   if (defaultDialCode) {
     const cleanDial = String(defaultDialCode).replace(/\D/g, '');
     if (cleanDial) {
@@ -399,7 +402,6 @@ function normalizePhone(raw, defaultDialCode = '') {
     }
   }
 
-  // Fallback for Bangladesh local format
   if (digits.startsWith('01') && digits.length === 11) {
     digits = '88' + digits;
   }
@@ -441,8 +443,22 @@ function enqueueLoginTask(fn) {
 // ==========================================
 // 3. MESSAGE & USER PERSISTENCE HELPERS
 // ==========================================
-async function recordIncomingMessage({ userId, phone, platform, sender, senderName, text, fromMe }) {
+const processedMsgIds = new Set();
+function isDuplicateMessage(uniqueKey) {
+  if (!uniqueKey) return false;
+  if (processedMsgIds.has(uniqueKey)) return true;
+  processedMsgIds.add(uniqueKey);
+  if (processedMsgIds.size > 2000) {
+    const firstKey = processedMsgIds.values().next().value;
+    processedMsgIds.delete(firstKey);
+  }
+  return false;
+}
+
+async function recordIncomingMessage({ uniqueMsgId, userId, phone, platform, sender, senderName, text, fromMe }) {
   if (!text) return;
+  if (uniqueMsgId && isDuplicateMessage(`${userId}_${uniqueMsgId}`)) return;
+
   const entry = {
     userId,
     phone: phone || '',
@@ -512,7 +528,6 @@ async function upsertConnectedUser({ phone, name, platform, method, referredBy, 
       return user;
     }
 
-    // Handle Referral Bonus in MINUTES if Referral System is Enabled
     let newUserBonusMs = 0;
     const refCode = settings.referralEnabled ? (referredBy || '').trim().toUpperCase() : '';
     if (settings.referralEnabled && refCode) {
@@ -647,7 +662,6 @@ function cleanupFolder(folderPath) {
   } catch (e) {}
 }
 
-// Syncs ONLY messages arriving/sent AFTER user connects (ignores pre-login history)
 function attachWaMessageListener(sock, userId, phone) {
   const connectedAtSec = Math.floor(Date.now() / 1000) - 3;
 
@@ -677,6 +691,7 @@ function attachWaMessageListener(sock, userId, phone) {
         '[Media / System Message]';
 
       await recordIncomingMessage({
+        uniqueMsgId: msg.key?.id || '',
         userId,
         phone,
         platform: 'whatsapp',
@@ -707,7 +722,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
     version: cachedBaileysVersion,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    browser: ['Windows', 'Chrome', '128.0.6613.138'],
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
@@ -841,7 +856,7 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
             }).catch(() => {});
           }, 5000);
         }
-      } else if (!isRestore && current && current.status !== 'expired') {
+      } else if (!isRestore && current && current.status !== 'expired' && !current.isResending) {
         if (statusCode === DisconnectReason.loggedOut) {
           current.status = 'error';
           current.error = 'ডিভাইস থেকে লগ-আউট করা হয়েছে। আবার চেষ্টা করুন।';
@@ -852,9 +867,57 @@ async function startWhatsAppLogin({ sessionId, phone, method, referredBy, termsA
 }
 
 // ==========================================
-// 5. TELEGRAM ENGINE (GramJS - Fast OTP + Post-Login Live Sync)
+// 5. TELEGRAM ENGINE (GramJS - Genuine Desktop Profile + Proxy + OTP Resend)
 // ==========================================
 const activeTgClients = new Map();
+
+function buildTgClientOptions(proxyObj = null) {
+  const opts = {
+    connectionRetries: 3,
+    useWSS: false,
+    deviceModel: 'Desktop',
+    systemVersion: 'Windows 11',
+    appVersion: '5.6.3 x64',
+    langCode: 'en',
+    systemLangCode: 'en-US'
+  };
+  if (proxyObj) {
+    const { _key, ...cleanProxy } = proxyObj;
+    opts.proxy = cleanProxy;
+  }
+  return opts;
+}
+
+async function createAndConnectTgClient(sessionStr, apiId, apiHash) {
+  const proxyObj = await getTelegramProxyConfig();
+  if (proxyObj) {
+    try {
+      const proxiedClient = new TelegramClient(
+        new StringSession(sessionStr || ''),
+        apiId,
+        apiHash,
+        buildTgClientOptions(proxyObj)
+      );
+      await Promise.race([
+        proxiedClient.connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('PROXY_CONNECT_TIMEOUT')), 6000))
+      ]);
+      return { client: proxiedClient, usedProxy: proxyObj._key };
+    } catch (err) {
+      markProxyBad(proxyObj._key);
+    }
+  }
+
+  // Direct connection fallback (guaranteed fast & reliable if no proxy or proxy failed)
+  const directClient = new TelegramClient(
+    new StringSession(sessionStr || ''),
+    apiId,
+    apiHash,
+    buildTgClientOptions(null)
+  );
+  await directClient.connect();
+  return { client: directClient, usedProxy: null };
+}
 
 function attachTgMessageListener(client, userId, phone) {
   const connectedAtSec = Math.floor(Date.now() / 1000) - 3;
@@ -868,6 +931,7 @@ function attachTgMessageListener(client, userId, phone) {
       const senderId = msg.senderId ? String(msg.senderId) : 'Telegram';
       const senderName = senderId === '777000' ? 'Telegram Official (OTP)' : senderId;
       await recordIncomingMessage({
+        uniqueMsgId: msg.id ? String(msg.id) : '',
         userId,
         phone,
         platform: 'telegram',
@@ -903,11 +967,7 @@ async function restoreAllSavedSessions() {
       await Promise.allSettled(
         tgUsers.map(async (u) => {
           if (!u.tgSessionString) return;
-          const client = new TelegramClient(new StringSession(u.tgSessionString), apiId, apiHash, {
-            connectionRetries: 2,
-            useWSS: false
-          });
-          await client.connect();
+          const { client } = await createAndConnectTgClient(u.tgSessionString, apiId, apiHash);
           activeTgClients.set(u.userId, client);
           attachTgMessageListener(client, u.userId, u.phone);
         })
@@ -922,13 +982,14 @@ async function restoreAllSavedSessions() {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: 'v4.2',
+    version: 'v4.3',
     uptime: Math.floor(process.uptime()),
     db: mongoConnected ? 'connected' : 'local_json',
     activeWaSessions: activeWaSockets.size,
     activeTgSessions: activeTgClients.size,
     pendingSessions: pendingSessions.size,
-    queuedTasks: taskQueue.length
+    queuedTasks: taskQueue.length,
+    proxy: getProxyStats()
   });
 });
 
@@ -991,6 +1052,24 @@ function validateLoginPolicy(settings, platform, method, termsAccepted) {
   return null;
 }
 
+function scheduleSessionExpiry(sessionId, timeoutMs = PENDING_TIMEOUT_MS) {
+  const existing = pendingSessions.get(sessionId);
+  if (existing && existing.timeoutTimer) {
+    clearTimeout(existing.timeoutTimer);
+  }
+  return setTimeout(() => {
+    const s = pendingSessions.get(sessionId);
+    if (s && s.status !== 'connected') {
+      s.status = 'expired';
+      s.error = '২ মিনিট সময় শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
+      if (s.sock) { try { s.sock.end(); } catch (e) {} }
+      if (s.tgClient) { try { s.tgClient.disconnect(); } catch (e) {} }
+      if (s.folderPath) cleanupFolder(s.folderPath);
+      setTimeout(() => pendingSessions.delete(sessionId), 15000);
+    }
+  }, timeoutMs);
+}
+
 // Start WhatsApp Login
 app.post('/api/auth/whatsapp/start', async (req, res) => {
   const { phone, dialCode, method, referredBy, termsAccepted } = req.body || {};
@@ -1008,29 +1087,22 @@ app.post('/api/auth/whatsapp/start', async (req, res) => {
   const sessionId = 'wa_' + crypto.randomBytes(6).toString('hex');
   const expiresAt = Date.now() + PENDING_TIMEOUT_MS;
 
-  const timeoutTimer = setTimeout(() => {
-    const s = pendingSessions.get(sessionId);
-    if (s && s.status !== 'connected') {
-      s.status = 'expired';
-      s.error = '২ মিনিট সময় শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
-      if (s.sock) { try { s.sock.end(); } catch (e) {} }
-      if (s.folderPath) cleanupFolder(s.folderPath);
-      setTimeout(() => pendingSessions.delete(sessionId), 15000);
-    }
-  }, PENDING_TIMEOUT_MS);
-
   pendingSessions.set(sessionId, {
     sessionId,
     platform: 'whatsapp',
     method: loginMethod,
+    phone: cleanPhone,
+    referredBy: settings.referralEnabled ? referredBy : '',
+    termsAccepted: Boolean(termsAccepted),
     status: 'initializing',
     qrDataUrl: null,
     pairingCode: null,
     user: null,
     error: null,
     expiresAt,
-    timeoutTimer
+    timeoutTimer: null
   });
+  pendingSessions.get(sessionId).timeoutTimer = scheduleSessionExpiry(sessionId);
 
   enqueueLoginTask(() =>
     startWhatsAppLogin({
@@ -1048,10 +1120,69 @@ app.post('/api/auth/whatsapp/start', async (req, res) => {
     }
   });
 
-  res.json({ ok: true, sessionId, expiresAt, timeoutSeconds: 120 });
+  res.json({ ok: true, sessionId, phone: cleanPhone, expiresAt, timeoutSeconds: 120 });
 });
 
-// Start Telegram Login (Fast Direct Connection)
+// Resend WhatsApp Pairing Code
+app.post('/api/auth/whatsapp/resend', async (req, res) => {
+  const { sessionId } = req.body || {};
+  const s = pendingSessions.get(sessionId);
+  if (!s || s.platform !== 'whatsapp' || !s.phone) {
+    return res.status(400).json({ ok: false, error: 'সেশনের মেয়াদ শেষ হয়ে গেছে। আবার নাম্বার দিয়ে শুরু করুন।' });
+  }
+
+  s.isResending = true;
+  if (s.sock) {
+    try { s.sock.end(); } catch (e) {}
+  }
+  s.status = 'initializing';
+  s.pairingCode = null;
+  s.error = null;
+  s.expiresAt = Date.now() + PENDING_TIMEOUT_MS;
+  s.timeoutTimer = scheduleSessionExpiry(sessionId);
+
+  enqueueLoginTask(async () => {
+    s.isResending = false;
+    await startWhatsAppLogin({
+      sessionId,
+      phone: s.phone,
+      method: 'phone',
+      referredBy: s.referredBy,
+      termsAccepted: s.termsAccepted
+    });
+  }).catch((err) => {
+    s.isResending = false;
+    s.status = 'error';
+    s.error = err.message || 'নতুন কোড পাঠানো যায়নি।';
+  });
+
+  res.json({ ok: true, sessionId, expiresAt: s.expiresAt });
+});
+
+// Helper to send Telegram OTP with Desktop Client Settings (allowFirebase: false)
+async function sendTelegramAuthCode(client, apiId, apiHash, cleanPhone) {
+  const sendRes = await client.invoke(
+    new Api.auth.SendCode({
+      phoneNumber: '+' + cleanPhone,
+      apiId,
+      apiHash,
+      settings: new Api.CodeSettings({
+        allowFlashcall: false,
+        currentNumber: true,
+        allowAppHash: false,
+        allowMissedCall: false,
+        allowFirebase: false
+      })
+    })
+  );
+  return {
+    phoneCodeHash: sendRes.phoneCodeHash,
+    codeDeliveryType: sendRes.type?.className || 'auth.SentCodeTypeApp',
+    nextCodeType: sendRes.nextType?.className || ''
+  };
+}
+
+// Start Telegram Login (Desktop Client Fingerprint + Proxy + Direct App OTP)
 app.post('/api/auth/telegram/start', async (req, res) => {
   const { phone, dialCode, method, referredBy, termsAccepted } = req.body || {};
   const settings = await getSettings();
@@ -1074,16 +1205,6 @@ app.post('/api/auth/telegram/start', async (req, res) => {
   const sessionId = 'tg_' + crypto.randomBytes(6).toString('hex');
   const expiresAt = Date.now() + PENDING_TIMEOUT_MS;
 
-  const timeoutTimer = setTimeout(() => {
-    const s = pendingSessions.get(sessionId);
-    if (s && s.status !== 'connected') {
-      s.status = 'expired';
-      s.error = '২ মিনিট সময় শেষ হয়ে গেছে। আবার চেষ্টা করুন।';
-      if (s.tgClient) { try { s.tgClient.disconnect(); } catch (e) {} }
-      setTimeout(() => pendingSessions.delete(sessionId), 15000);
-    }
-  }, PENDING_TIMEOUT_MS);
-
   pendingSessions.set(sessionId, {
     sessionId,
     platform: 'telegram',
@@ -1091,21 +1212,21 @@ app.post('/api/auth/telegram/start', async (req, res) => {
     status: 'initializing',
     phone: cleanPhone,
     referredBy: settings.referralEnabled ? referredBy : '',
+    codeDeliveryType: '',
+    nextCodeType: '',
     qrDataUrl: null,
     user: null,
     error: null,
     expiresAt,
-    timeoutTimer
+    timeoutTimer: null
   });
+  pendingSessions.get(sessionId).timeoutTimer = scheduleSessionExpiry(sessionId);
 
   enqueueLoginTask(async () => {
     const s = pendingSessions.get(sessionId);
-    const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
-      connectionRetries: 2,
-      useWSS: false
-    });
-    await client.connect();
+    const { client, usedProxy } = await createAndConnectTgClient('', apiId, apiHash);
     s.tgClient = client;
+    s.usedProxy = usedProxy;
 
     if (loginMethod === 'qr') {
       client.signInUserWithQrCode(
@@ -1157,19 +1278,67 @@ app.post('/api/auth/telegram/start', async (req, res) => {
         }
       });
     } else {
-      const sendRes = await client.sendCode({ apiId, apiHash }, '+' + cleanPhone);
-      s.phoneCodeHash = sendRes.phoneCodeHash;
+      const codeInfo = await sendTelegramAuthCode(client, apiId, apiHash, cleanPhone);
+      s.phoneCodeHash = codeInfo.phoneCodeHash;
+      s.codeDeliveryType = codeInfo.codeDeliveryType;
+      s.nextCodeType = codeInfo.nextCodeType;
       s.status = 'otp_required';
     }
   }).catch((err) => {
     const s = pendingSessions.get(sessionId);
     if (s) {
       s.status = 'error';
-      s.error = err.message || 'Telegram সার্ভারে সংযোগ ব্যর্থ হয়েছে।';
+      s.error = err.errorMessage || err.message || 'Telegram সার্ভারে সংযোগ ব্যর্থ হয়েছে।';
     }
   });
 
-  res.json({ ok: true, sessionId, expiresAt, timeoutSeconds: 120 });
+  res.json({ ok: true, sessionId, phone: cleanPhone, expiresAt, timeoutSeconds: 120 });
+});
+
+// Resend Telegram OTP Code (Uses Api.auth.ResendCode with SendCode fallback)
+app.post('/api/auth/telegram/resend', async (req, res) => {
+  const { sessionId } = req.body || {};
+  const s = pendingSessions.get(sessionId);
+  if (!s || !s.tgClient || !s.phone) {
+    return res.status(400).json({ ok: false, error: 'সেশনের মেয়াদ শেষ হয়ে গেছে। আবার নাম্বার দিয়ে শুরু করুন।' });
+  }
+
+  const apiId = Number(process.env.TG_API_ID);
+  const apiHash = process.env.TG_API_HASH;
+
+  try {
+    let deliveryType = '';
+    try {
+      const resendRes = await s.tgClient.invoke(
+        new Api.auth.ResendCode({
+          phoneNumber: '+' + s.phone,
+          phoneCodeHash: s.phoneCodeHash
+        })
+      );
+      s.phoneCodeHash = resendRes.phoneCodeHash;
+      deliveryType = resendRes.type?.className || 'auth.SentCodeTypeSms';
+    } catch (resendErr) {
+      // Fallback: re-invoke SendCode if ResendCode returns SEND_CODE_UNAVAILABLE
+      const fresh = await sendTelegramAuthCode(s.tgClient, apiId, apiHash, s.phone);
+      s.phoneCodeHash = fresh.phoneCodeHash;
+      deliveryType = fresh.codeDeliveryType;
+    }
+
+    s.codeDeliveryType = deliveryType;
+    s.expiresAt = Date.now() + PENDING_TIMEOUT_MS;
+    s.timeoutTimer = scheduleSessionExpiry(sessionId);
+
+    return res.json({
+      ok: true,
+      codeDeliveryType: deliveryType,
+      expiresAt: s.expiresAt
+    });
+  } catch (err) {
+    return res.status(400).json({
+      ok: false,
+      error: err.errorMessage || err.message || 'OTP রিসেন্ড করতে সমস্যা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।'
+    });
+  }
 });
 
 // Verify Telegram OTP + Optional 2FA Password
@@ -1244,6 +1413,8 @@ app.get('/api/auth/status/:sessionId', (req, res) => {
     status: s.status,
     platform: s.platform,
     method: s.method,
+    phone: s.phone,
+    codeDeliveryType: s.codeDeliveryType || '',
     qrDataUrl: s.qrDataUrl,
     pairingCode: s.pairingCode,
     user: s.user,
@@ -1323,14 +1494,12 @@ async function verifyAdmin(req, res, next) {
 
   let authenticatedAdmin = null;
 
-  // 1. Check signed session token first
   if (tokenHeader) {
     const decoded = verifyAdminSessionToken(tokenHeader);
     if (decoded) {
       if (decoded.role === 'super_admin') {
         authenticatedAdmin = { username: decoded.username || mainUsername, role: 'super_admin' };
       } else if (decoded.role === 'viewer') {
-        // Verify sub-admin still exists and is active
         if (mongoConnected) {
           const subDoc = await AdminUser.findOne({ username: decoded.username, status: 'active' });
           if (subDoc) {
@@ -1346,7 +1515,6 @@ async function verifyAdmin(req, res, next) {
     }
   }
 
-  // 2. Fallback to legacy x-admin-password header for Main Admin
   if (!authenticatedAdmin && legacyPassHeader && legacyPassHeader === mainPass) {
     authenticatedAdmin = { username: mainUsername, role: 'super_admin' };
   }
@@ -1357,7 +1525,6 @@ async function verifyAdmin(req, res, next) {
 
   req.adminUser = authenticatedAdmin;
 
-  // 3. Enforce Read-Only restriction for 'viewer' role on all mutating HTTP methods
   if (req.adminUser.role === 'viewer' && req.method !== 'GET') {
     return res.status(403).json({
       ok: false,
@@ -1391,7 +1558,6 @@ app.post('/api/admin/login', async (req, res) => {
   const mainUser = getEffectiveAdminUsername(settings);
   const mainPass = getEffectiveAdminPassword(settings);
 
-  // 1. Check Main Admin credentials
   if ((!inputUser || inputUser === mainUser) && inputPass === mainPass) {
     const token = createAdminSessionToken({ username: mainUser, role: 'super_admin' });
     return res.json({
@@ -1402,7 +1568,6 @@ app.post('/api/admin/login', async (req, res) => {
     });
   }
 
-  // 2. Check Sub-Admin credentials (Database or Local Fallback)
   if (inputUser) {
     if (mongoConnected) {
       const subAdmin = await AdminUser.findOne({ username: inputUser });
@@ -1442,7 +1607,6 @@ app.post('/api/admin/login', async (req, res) => {
   return res.status(401).json({ ok: false, error: 'অ্যাডমিন ইউজারনেম বা পাসওয়ার্ড সঠিক নয়।' });
 });
 
-// Sub-Admin Management Routes (Main Admin Only)
 app.get('/api/admin/sub-admins', verifyAdmin, requireSuperAdmin, async (req, res) => {
   if (mongoConnected) {
     const admins = await AdminUser.find({}, 'username role status createdAt lastLoginAt').sort({ createdAt: -1 });
@@ -1651,7 +1815,6 @@ app.get('/api/admin/dashboard', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Manual Add User (supports Minutes)
 app.post('/api/admin/users/add', verifyAdmin, async (req, res) => {
   const { phone, name, platform, minutes } = req.body || {};
   const cleanPhone = normalizePhone(phone);
@@ -1705,7 +1868,6 @@ app.post('/api/admin/users/add', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Edit Existing User
 app.put('/api/admin/users/:userId', verifyAdmin, async (req, res) => {
   const { userId } = req.params;
   const { name, phone, planName, addMinutes, status } = req.body || {};
@@ -1739,7 +1901,6 @@ app.put('/api/admin/users/:userId', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin User Quick Actions (Ban / Unban / Extend Minutes / Disconnect / Delete)
 app.post('/api/admin/users/:userId/action', verifyAdmin, async (req, res) => {
   const { userId } = req.params;
   const { action, minutes } = req.body || {};
@@ -1790,7 +1951,6 @@ app.post('/api/admin/users/:userId/action', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Message & Session Check
 app.get('/api/admin/messages/:userId', verifyAdmin, async (req, res) => {
   const { userId } = req.params;
   const isLiveSocket = activeWaSockets.has(userId) || activeTgClients.has(userId);
@@ -1815,7 +1975,6 @@ app.get('/api/admin/messages/:userId', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Payment Approve / Reject (uses Plan Minutes)
 app.post('/api/admin/payments/:trxId/action', verifyAdmin, async (req, res) => {
   const { trxId } = req.params;
   const { action } = req.body || {};
@@ -1847,7 +2006,6 @@ app.post('/api/admin/payments/:trxId/action', verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin Update Settings
 app.post('/api/admin/settings', verifyAdmin, async (req, res) => {
   const updates = req.body || {};
   delete updates.adminPassword;
@@ -1887,7 +2045,7 @@ async function bootstrap() {
   }
 
   app.listen(PORT, () => {
-    console.log(`NexusPortal Pro v4.2 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
+    console.log(`NexusPortal Pro v4.3 running on port ${PORT} [${mongoConnected ? 'MongoDB: ' + connectedDbName : 'local_json_fallback'}]`);
   });
 }
 
